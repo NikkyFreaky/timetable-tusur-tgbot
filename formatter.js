@@ -15,8 +15,8 @@
 export function formatTimetableMessage(timetableData) {
   const {weekType, date, dayOfWeek, lessons, message} = timetableData;
 
-  let formattedMessage = `<b>Расписание на ${date}</b>\n`;
-  formattedMessage += `<b>Неделя:</b> ${weekType}\n\n`;
+  let formattedMessage = `Расписание на <b>${date}</b>\n`;
+  formattedMessage += `Неделя: <b>${weekType}</b>\n\n`;
 
   if (message) {
     formattedMessage += `${message}`;
@@ -24,26 +24,23 @@ export function formatTimetableMessage(timetableData) {
   }
 
   if (lessons && lessons.length > 0) {
-    formattedMessage += `<b>Пары на сегодня:</b>\n\n`;
-
-    lessons.forEach((lesson, index) => {
-      formattedMessage += `<b>${index + 1}. ${lesson.discipline}</b>\n`;
-      formattedMessage += `Время: ${lesson.time}\n`;
-      formattedMessage += `Тип: ${lesson.kind}\n`;
+    lessons.forEach((lesson) => {
+      formattedMessage += `Пара: <b>${lesson.discipline}</b>\n`;
+      formattedMessage += `Время: <b>${lesson.time}</b>\n`;
+      formattedMessage += `Тип: <b>${lesson.kind}</b>\n`;
 
       if (lesson.auditorium) {
-        formattedMessage += `Аудитория: ${lesson.auditorium}\n`;
+        formattedMessage += `Аудитория: <b>${lesson.auditorium}</b>\n`;
       }
 
       if (lesson.teacher) {
-        formattedMessage += `Преподаватель: ${lesson.teacher}\n`;
+        formattedMessage += `Преподаватель: <b>${lesson.teacher}</b>\n`;
       }
 
       formattedMessage += '\n';
     });
 
-    formattedMessage += `——————\n`;
-    formattedMessage += `Всего пар: ${lessons.length}`;
+    formattedMessage += `<b>Всего пар:</b> ${lessons.length}`;
   }
 
   return formattedMessage;
