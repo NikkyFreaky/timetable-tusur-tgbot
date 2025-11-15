@@ -17,8 +17,8 @@ import {MESSAGES} from '../config/messages.js';
 export function formatTimetableMessage(timetableData) {
   const {weekType, date, dayOfWeek, lessons, message} = timetableData;
 
-  let formattedMessage = `${MESSAGES.TIMETABLE_HEADER} <b>${date}</b>\n`;
-  formattedMessage += `${MESSAGES.TIMETABLE_WEEK} <b>${weekType}</b>\n\n`;
+  let formattedMessage = `<b>${MESSAGES.TIMETABLE_HEADER} ${date}</b>\n`;
+  formattedMessage += `${MESSAGES.TIMETABLE_WEEK} ${weekType}\n\n`;
 
   if (message) {
     formattedMessage += `${message}`;
@@ -27,16 +27,16 @@ export function formatTimetableMessage(timetableData) {
 
   if (lessons && lessons.length > 0) {
     lessons.forEach((lesson) => {
-      formattedMessage += `${MESSAGES.TIMETABLE_LESSON} <b>${lesson.discipline}</b>\n`;
-      formattedMessage += `${MESSAGES.TIMETABLE_TIME} <b>${lesson.time}</b>\n`;
-      formattedMessage += `${MESSAGES.TIMETABLE_TYPE} <b>${lesson.kind}</b>\n`;
+      formattedMessage += `${MESSAGES.TIMETABLE_LESSON} ${lesson.discipline}\n`;
+      formattedMessage += `${MESSAGES.TIMETABLE_TIME} ${lesson.time}\n`;
+      formattedMessage += `${MESSAGES.TIMETABLE_TYPE} ${lesson.kind}\n`;
 
       if (lesson.auditorium) {
-        formattedMessage += `${MESSAGES.TIMETABLE_AUDITORIUM} <b>${lesson.auditorium}</b>\n`;
+        formattedMessage += `${MESSAGES.TIMETABLE_AUDITORIUM} ${lesson.auditorium}\n`;
       }
 
       if (lesson.teacher) {
-        formattedMessage += `${MESSAGES.TIMETABLE_TEACHER} <b>${lesson.teacher}</b>\n`;
+        formattedMessage += `${MESSAGES.TIMETABLE_TEACHER} ${lesson.teacher}\n`;
       }
 
       formattedMessage += '\n';
@@ -62,4 +62,3 @@ export function formatErrorMessage(details = null) {
 
   return errorMessage;
 }
-

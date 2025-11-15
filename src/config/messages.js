@@ -120,14 +120,14 @@ export const MESSAGES = {
 
   // Расписание
   TIMETABLE_HEADER: '📅 Расписание на',
-  TIMETABLE_WEEK: '  Неделя:',
+  TIMETABLE_WEEK: '        <b>Неделя:</b>',
   TIMETABLE_NO_LESSONS: '➖ На текущий день нет расписания',
   TIMETABLE_NO_LESSONS_TODAY: '✅ Сегодня нет пар',
-  TIMETABLE_LESSON: '📖 Пара:',
-  TIMETABLE_TIME: '⏰ Время:',
-  TIMETABLE_TYPE: '📝 Тип:',
-  TIMETABLE_AUDITORIUM: '🏫 Аудитория:',
-  TIMETABLE_TEACHER: '👨‍🏫 Преподаватель:',
+  TIMETABLE_LESSON: '<b>📖 Пара:</b>',
+  TIMETABLE_TIME: '<b>⏰ Время:</b>',
+  TIMETABLE_TYPE: '<b>📝 Тип:</b>',
+  TIMETABLE_AUDITORIUM: '<b>🏫 Аудитория:</b>',
+  TIMETABLE_TEACHER: '<b>👨‍🏫 Преподаватель:</b>',
   TIMETABLE_TOTAL: '<b>📊 Всего пар:</b>',
 
   // Разное
