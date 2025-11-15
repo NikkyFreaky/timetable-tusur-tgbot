@@ -121,6 +121,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     'back_to_chats',
     'back_to_settings',
     'select_chat',
+    'toggle_user_enabled',
+    'change_user_group',
+    'change_user_time',
   ];
 
   // Если это действие без проверки настроек, обрабатываем его отдельно
