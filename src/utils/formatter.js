@@ -2,6 +2,8 @@
  * Форматирование сообщений для Telegram
  */
 
+import {MESSAGES} from '../config/messages.js';
+
 /**
  * Форматирует данные расписания в красивое сообщение для Telegram
  * @param {Object} timetableData - Данные расписания
@@ -15,8 +17,8 @@
 export function formatTimetableMessage(timetableData) {
   const {weekType, date, dayOfWeek, lessons, message} = timetableData;
 
-  let formattedMessage = `Расписание на <b>${date}</b>\n`;
-  formattedMessage += `Неделя: <b>${weekType}</b>\n\n`;
+  let formattedMessage = `${MESSAGES.TIMETABLE_HEADER} <b>${date}</b>\n`;
+  formattedMessage += `${MESSAGES.TIMETABLE_WEEK} <b>${weekType}</b>\n\n`;
 
   if (message) {
     formattedMessage += `${message}`;
@@ -25,22 +27,22 @@ export function formatTimetableMessage(timetableData) {
 
   if (lessons && lessons.length > 0) {
     lessons.forEach((lesson) => {
-      formattedMessage += `Пара: <b>${lesson.discipline}</b>\n`;
-      formattedMessage += `Время: <b>${lesson.time}</b>\n`;
-      formattedMessage += `Тип: <b>${lesson.kind}</b>\n`;
+      formattedMessage += `${MESSAGES.TIMETABLE_LESSON} <b>${lesson.discipline}</b>\n`;
+      formattedMessage += `${MESSAGES.TIMETABLE_TIME} <b>${lesson.time}</b>\n`;
+      formattedMessage += `${MESSAGES.TIMETABLE_TYPE} <b>${lesson.kind}</b>\n`;
 
       if (lesson.auditorium) {
-        formattedMessage += `Аудитория: <b>${lesson.auditorium}</b>\n`;
+        formattedMessage += `${MESSAGES.TIMETABLE_AUDITORIUM} <b>${lesson.auditorium}</b>\n`;
       }
 
       if (lesson.teacher) {
-        formattedMessage += `Преподаватель: <b>${lesson.teacher}</b>\n`;
+        formattedMessage += `${MESSAGES.TIMETABLE_TEACHER} <b>${lesson.teacher}</b>\n`;
       }
 
       formattedMessage += '\n';
     });
 
-    formattedMessage += `<b>Всего пар:</b> ${lessons.length}`;
+    formattedMessage += `${MESSAGES.TIMETABLE_TOTAL} ${lessons.length}`;
   }
 
   return formattedMessage;
@@ -52,13 +54,12 @@ export function formatTimetableMessage(timetableData) {
  * @returns {string} Отформатированное сообщение об ошибке
  */
 export function formatErrorMessage(details = null) {
-  let errorMessage = '<b>Произошла ошибка при получении расписания</b>\n\n';
+  let errorMessage = MESSAGES.ERROR_TIMETABLE + '\n\n';
 
   if (details) {
     errorMessage += `<i>Детали: ${details}</i>\n\n`;
   }
 
-  errorMessage += 'Пожалуйста, попробуйте позже или проверьте настройки бота.';
-
   return errorMessage;
 }
+

@@ -1,11 +1,14 @@
-// ==================== IMPORTS ====================
-import {handleCommand} from './commands.js';
-import {formatErrorMessage, formatTimetableMessage} from './formatter.js';
-import {fetchTimetable, parseTimetable} from './parser.js';
-import {getAllActiveChats} from './settings.js';
-import {sendTelegramMessage} from './telegram.js';
+/**
+ * Cloudflare Worker для бота расписания ТУСУР
+ */
 
-// ==================== HELPER FUNCTIONS ====================
+import {DEBOUNCE_MS} from './config/constants.js';
+import {handleUpdate} from './handlers/updateHandler.js';
+import {formatErrorMessage, formatTimetableMessage} from './utils/formatter.js';
+import {sendTelegramMessage} from './utils/telegramApi.js';
+import {fetchTimetable, parseTimetable} from './parsers/timetableParser.js';
+import {getAllActiveChats} from './services/settingsService.js';
+
 /**
  * Отправляет расписание в конкретный чат
  * @param {string} botToken - Токен бота
@@ -57,7 +60,6 @@ async function sendTimetableToChat(botToken, chatSettings, date = new Date()) {
   }
 }
 
-// ==================== MAIN HANDLERS ====================
 /**
  * Обработка webhook от Telegram
  * @param {Request} request - HTTP запрос
@@ -76,7 +78,7 @@ async function handleWebhook(request, env) {
       throw new Error('SETTINGS_KV не настроен');
     }
 
-    await handleCommand(update, env.BOT_TOKEN, env.SETTINGS_KV);
+    await handleUpdate(update, env.BOT_TOKEN, env.SETTINGS_KV);
 
     return new Response(JSON.stringify({ok: true}), {
       status: 200,
@@ -187,14 +189,12 @@ async function handleScheduledTimetable(request, env) {
   }
 }
 
-// ==================== CLOUDFLARE WORKERS EXPORT ====================
+// Переменные для дебаунса
+let lastRequestTime = 0;
+
 /**
  * Экспорт для Cloudflare Workers
  */
-
-let lastRequestTime = 0;
-const DEBOUNCE_MS = 1000;
-
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -254,3 +254,4 @@ export default {
     return await response.json();
   },
 };
+

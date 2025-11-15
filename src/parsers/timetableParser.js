@@ -1,6 +1,8 @@
 /**
- * Простой HTML парсер для расписания ТУСУР без использования jsdom
+ * Парсер для получения расписания группы
  */
+
+import {DAYS_SHORT, MONTHS_SHORT, WEEK_TYPES} from '../config/constants.js';
 
 /**
  * Извлекает тип недели из HTML
@@ -17,9 +19,10 @@ function extractWeekType(html) {
     const match = html.match(pattern);
     if (match) {
       const text = match[1] || match[2];
-      if (text.includes('чётная') || text.includes('четная')) return 'чётная';
+      if (text.includes('чётная') || text.includes('четная'))
+        return WEEK_TYPES.EVEN;
       if (text.includes('нечётная') || text.includes('нечетная'))
-        return 'нечётная';
+        return WEEK_TYPES.ODD;
     }
   }
 
@@ -43,7 +46,7 @@ function calculateWeekType(date) {
   const diffDays = Math.floor((date - firstMonday) / 86400000);
   const weekNumber = Math.floor(diffDays / 7) + 1;
 
-  return weekNumber % 2 === 1 ? 'нечётная' : 'чётная';
+  return weekNumber % 2 === 1 ? WEEK_TYPES.ODD : WEEK_TYPES.EVEN;
 }
 
 /**
@@ -60,25 +63,9 @@ export function parseTimetable(html, date = new Date()) {
   }
 
   // Форматируем дату для поиска
-  const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-  const months = [
-    'янв',
-    'фев',
-    'мар',
-    'апр',
-    'май',
-    'июн',
-    'июл',
-    'авг',
-    'сен',
-    'окт',
-    'нояб',
-    'дек',
-  ];
-
-  const dayOfWeek = days[date.getDay()];
+  const dayOfWeek = DAYS_SHORT[date.getDay()];
   const dayOfMonth = date.getDate();
-  const month = months[date.getMonth()];
+  const month = MONTHS_SHORT[date.getMonth()];
 
   const dateString = `${dayOfWeek}, ${dayOfMonth} ${month}.`;
 
@@ -91,7 +78,7 @@ export function parseTimetable(html, date = new Date()) {
     return {
       weekType,
       date: dateString,
-      dayOfWeek: days[date.getDay()],
+      dayOfWeek: DAYS_SHORT[date.getDay()],
       lessons: null,
       message: 'На текущий день нет расписания',
     };
@@ -116,7 +103,7 @@ export function parseTimetable(html, date = new Date()) {
     return {
       weekType,
       date: dateString,
-      dayOfWeek: days[date.getDay()],
+      dayOfWeek: DAYS_SHORT[date.getDay()],
       lessons: null,
       message: 'На текущий день нет расписания',
     };
@@ -226,7 +213,7 @@ export function parseTimetable(html, date = new Date()) {
     return {
       weekType,
       date: dateString,
-      dayOfWeek: days[date.getDay()],
+      dayOfWeek: DAYS_SHORT[date.getDay()],
       lessons: [],
       message: 'Сегодня нет пар',
     };
@@ -235,7 +222,7 @@ export function parseTimetable(html, date = new Date()) {
   return {
     weekType,
     date: dateString,
-    dayOfWeek: days[date.getDay()],
+    dayOfWeek: DAYS_SHORT[date.getDay()],
     lessons,
     message: null,
   };
@@ -258,3 +245,4 @@ export async function fetchTimetable(url) {
     throw error;
   }
 }
+

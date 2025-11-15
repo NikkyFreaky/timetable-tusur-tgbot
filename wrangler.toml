@@ -1,5 +1,5 @@
 name = "timetable-425m-tgbot"
-main = "worker.js"
+main = "src/worker.js"
 compatibility_date = "2025-11-14"
 
 kv_namespaces = [
