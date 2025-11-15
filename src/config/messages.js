@@ -93,6 +93,7 @@ export const MESSAGES = {
   BUTTON_BACK_TO_SETTINGS: '◀️ Назад к настройкам',
   BUTTON_BACK_TO_FACULTIES: '◀️ Назад к факультетам',
   BUTTON_BACK_TO_COURSES: '◀️ Назад к курсам',
+  BUTTON_BACK_TO_CHATS: '◀️ К списку чатов',
   BUTTON_NO_THREADS: '➖ Нет доступных тем',
 
   // Справка

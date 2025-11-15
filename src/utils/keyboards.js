@@ -9,9 +9,10 @@ import {MESSAGES} from '../config/messages.js';
  * Создает inline клавиатуру для настроек чата
  * @param {string} chatId - ID чата
  * @param {Object} settings - Текущие настройки чата
+ * @param {boolean} showBackButton - Показывать ли кнопку "Назад к списку чатов"
  * @returns {Object} Inline keyboard markup
  */
-export function createSettingsKeyboard(chatId, settings) {
+export function createSettingsKeyboard(chatId, settings, showBackButton = false) {
   const keyboard = [
     [
       {
@@ -35,6 +36,16 @@ export function createSettingsKeyboard(chatId, settings) {
     ],
   ];
 
+  // Добавляем кнопку "Назад" если это личные сообщения
+  if (showBackButton) {
+    keyboard.push([
+      {
+        text: MESSAGES.BUTTON_BACK_TO_CHATS,
+        callback_data: `back_to_chats:${chatId}`,
+      },
+    ]);
+  }
+
   return {
     inline_keyboard: keyboard,
   };
@@ -48,7 +59,7 @@ export function createSettingsKeyboard(chatId, settings) {
 export function createChatsListKeyboard(chats) {
   const keyboard = chats.map((chat) => [
     {
-      text: `${chat.enabled ? '[Вкл] ' : '[Выкл] '}${
+      text: `${chat.enabled ? '✅' : '❌'} ${
         chat.chatName || `${MESSAGES.CHAT_PREFIX} ${chat.chatId}`
       }`,
       callback_data: `select_chat:${chat.chatId}`,
