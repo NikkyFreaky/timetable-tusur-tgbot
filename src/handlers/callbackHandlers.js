@@ -113,7 +113,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
   const action = parts[0];
   const targetChatId = parts[1];
 
-  // Действия, которые не требуют проверки прав и настроек
+  // Действия, которые не требуют предварительной проверки прав и настроек
+  // (они сами определяют, работают ли с личными настройками или групповыми)
   const actionsWithoutSettingsCheck = [
     'my_settings',
     'group_chats',
@@ -124,6 +125,15 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     'toggle_user_enabled',
     'change_user_group',
     'change_user_time',
+    'select_faculty',
+    'select_course',
+    'select_group',
+    'select_hour',
+    'select_minute',
+    'back_to_faculties',
+    'back_to_courses',
+    'change_time',
+    'change_group',
   ];
 
   // Если это действие без проверки настроек, обрабатываем его отдельно
@@ -500,14 +510,29 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         const groupSlug = parts[3];
         const groupUrl = `${BASE_URL}/faculties/${groupFacultySlug}/groups/${groupSlug}`;
 
-        settings.timetableUrl = groupUrl;
-        settings.groupSlug = groupSlug;
-        settings.facultySlug = groupFacultySlug;
+        // Загружаем настройки
+        const groupSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!groupSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        groupSettings.timetableUrl = groupUrl;
+        groupSettings.groupSlug = groupSlug;
+        groupSettings.facultySlug = groupFacultySlug;
         
         if (isUserSettings) {
-          await saveUserSettings(kv, actualUserId, settings);
+          await saveUserSettings(kv, actualUserId, groupSettings);
         } else {
-          await saveChatSettings(kv, targetChatId, settings);
+          await saveChatSettings(kv, targetChatId, groupSettings);
         }
 
         // Формируем текст и клавиатуру в зависимости от типа настроек
@@ -515,29 +540,29 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         let keyboard;
         
         if (isUserSettings) {
-          groupSuccessText = formatUserSettingsText(settings);
-          keyboard = createUserSettingsKeyboard(actualUserId, settings);
+          groupSuccessText = formatUserSettingsText(groupSettings);
+          keyboard = createUserSettingsKeyboard(actualUserId, groupSettings);
         } else {
-          const groupThreadDisplay = settings.threadName
-            ? settings.threadName
-            : settings.threadId
-            ? `ID: ${settings.threadId}`
+          const groupThreadDisplay = groupSettings.threadName
+            ? groupSettings.threadName
+            : groupSettings.threadId
+            ? `ID: ${groupSettings.threadId}`
             : MESSAGES.SETTINGS_NOT_SET;
 
           groupSuccessText =
             MESSAGES.SETTINGS_HEADER +
             `${MESSAGES.SETTINGS_CHAT_NAME} ${
-              settings.chatName || `ID: ${settings.chatId}`
+              groupSettings.chatName || `ID: ${groupSettings.chatId}`
             }\n` +
             `${MESSAGES.SETTINGS_STATUS} ${
-              settings.enabled ? MESSAGES.STATUS_ENABLED : MESSAGES.STATUS_DISABLED
+              groupSettings.enabled ? MESSAGES.STATUS_ENABLED : MESSAGES.STATUS_DISABLED
             }\n` +
             `${MESSAGES.SETTINGS_GROUP} ${groupSlug.toUpperCase()}\n` +
-            `${MESSAGES.SETTINGS_URL} ${settings.timetableUrl}\n` +
+            `${MESSAGES.SETTINGS_URL} ${groupSettings.timetableUrl}\n` +
             `${MESSAGES.SETTINGS_THREAD} ${groupThreadDisplay}\n\n` +
             MESSAGES.SETTINGS_SELECT_PARAMETER;
 
-          keyboard = createSettingsKeyboard(targetChatId, settings, isPrivateChat);
+          keyboard = createSettingsKeyboard(targetChatId, groupSettings, isPrivateChat);
         }
 
         await editMessage(botToken, chatId, messageId, groupSuccessText, {
@@ -646,15 +671,31 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       // Выбор часа - показываем выбор минут
       try {
         const selectedHour = parseInt(parts[2]);
-        settings.sendHour = selectedHour;
         
-        if (isUserSettings) {
-          await saveUserSettings(kv, actualUserId, settings);
-        } else {
-          await saveChatSettings(kv, targetChatId, settings);
+        // Загружаем настройки
+        const hourSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!hourSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
         }
 
-        const currentMinute = settings.sendMinute ?? 0;
+        hourSettings.sendHour = selectedHour;
+        
+        if (isUserSettings) {
+          await saveUserSettings(kv, actualUserId, hourSettings);
+        } else {
+          await saveChatSettings(kv, targetChatId, hourSettings);
+        }
+
+        const currentMinute = hourSettings.sendMinute ?? 0;
         const minuteText =
           MESSAGES.TIME_SELECTION_HEADER +
           `${MESSAGES.TIME_CURRENT} ${selectedHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}\n\n` +
@@ -680,23 +721,39 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       // Выбор минуты - сохраняем и возвращаемся к настройкам
       try {
         const selectedMinute = parseInt(parts[2]);
-        settings.sendMinute = selectedMinute;
+        
+        // Загружаем настройки
+        const minuteSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!minuteSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        minuteSettings.sendMinute = selectedMinute;
         
         if (isUserSettings) {
-          await saveUserSettings(kv, actualUserId, settings);
+          await saveUserSettings(kv, actualUserId, minuteSettings);
           
-          await editMessage(botToken, chatId, messageId, formatUserSettingsText(settings), {
-            reply_markup: createUserSettingsKeyboard(actualUserId, settings),
+          await editMessage(botToken, chatId, messageId, formatUserSettingsText(minuteSettings), {
+            reply_markup: createUserSettingsKeyboard(actualUserId, minuteSettings),
           });
         } else {
-          await saveChatSettings(kv, targetChatId, settings);
+          await saveChatSettings(kv, targetChatId, minuteSettings);
           
-          await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-            reply_markup: createSettingsKeyboard(targetChatId, settings, isPrivateChat),
+          await editMessage(botToken, chatId, messageId, formatSettingsText(minuteSettings), {
+            reply_markup: createSettingsKeyboard(targetChatId, minuteSettings, isPrivateChat),
           });
         }
 
-        const timeStr = `${settings.sendHour.toString().padStart(2, '0')}:${settings.sendMinute.toString().padStart(2, '0')}`;
+        const timeStr = `${minuteSettings.sendHour.toString().padStart(2, '0')}:${minuteSettings.sendMinute.toString().padStart(2, '0')}`;
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
