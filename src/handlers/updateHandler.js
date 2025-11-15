@@ -2,17 +2,22 @@
  * Главный обработчик обновлений от Telegram
  */
 
+import {MESSAGES} from '../config/messages.js';
+import {
+  getChatSettings,
+  saveChatSettings,
+} from '../services/settingsService.js';
+import {handleCallbackQuery} from './callbackHandlers.js';
 import {
   handleHelpCommand,
+  handleScheduleCommand,
   handleSetThreadCommand,
   handleSetUrlCommand,
   handleSettingsCommand,
   handleStartCommand,
   handleStatusCommand,
+  handleTodayCommand,
 } from './commandHandlers.js';
-import {handleCallbackQuery} from './callbackHandlers.js';
-import {getChatSettings, saveChatSettings} from '../services/settingsService.js';
-import {MESSAGES} from '../config/messages.js';
 
 /**
  * Обновляет кэш топиков форума при получении сообщения
@@ -101,6 +106,10 @@ export async function handleUpdate(update, botToken, kv) {
         await handleHelpCommand(message, botToken);
       } else if (text.startsWith('/status')) {
         await handleStatusCommand(message, botToken, kv);
+      } else if (text.startsWith('/today')) {
+        await handleTodayCommand(message, botToken, kv);
+      } else if (text.startsWith('/schedule')) {
+        await handleScheduleCommand(message, botToken, kv);
       } else if (text.startsWith('/seturl')) {
         const url = text.split(' ')[1];
         await handleSetUrlCommand(message, botToken, kv, url);
@@ -114,5 +123,3 @@ export async function handleUpdate(update, botToken, kv) {
     // Игнорируем ошибки обработки
   }
 }
-
-

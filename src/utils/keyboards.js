@@ -2,7 +2,7 @@
  * Утилиты для создания inline клавиатур
  */
 
-import {KEYBOARD_LAYOUT, AVAILABLE_MINUTES} from '../config/constants.js';
+import {KEYBOARD_LAYOUT, AVAILABLE_MINUTES, DAYS_FULL} from '../config/constants.js';
 import {MESSAGES} from '../config/messages.js';
 
 /**
@@ -14,6 +14,18 @@ import {MESSAGES} from '../config/messages.js';
  */
 export function createSettingsKeyboard(chatId, settings, showBackButton = false) {
   const keyboard = [
+    [
+      {
+        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
+        callback_data: `get_today:${chatId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
+        callback_data: `select_day:${chatId}`,
+      },
+    ],
     [
       {
         text: settings.enabled
@@ -67,6 +79,18 @@ export function createUserSettingsKeyboard(userId, settings) {
   const keyboard = [
     [
       {
+        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
+        callback_data: `get_today:user:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
+        callback_data: `select_day:user:${userId}`,
+      },
+    ],
+    [
+      {
         text: settings.enabled
           ? MESSAGES.BUTTON_ENABLED
           : MESSAGES.BUTTON_DISABLED,
@@ -105,6 +129,18 @@ export function createUserSettingsKeyboard(userId, settings) {
  */
 export function createMainMenuKeyboard(userId) {
   const keyboard = [
+    [
+      {
+        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
+        callback_data: `get_today:user:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
+        callback_data: `select_day:user:${userId}`,
+      },
+    ],
     [
       {
         text: MESSAGES.BUTTON_MY_SETTINGS,
@@ -393,3 +429,33 @@ export function createMinuteSelectionKeyboard(chatId, currentMinute = 0) {
   };
 }
 
+/**
+ * Создает inline клавиатуру для выбора дня недели
+ * @param {string} targetId - ID чата или user:userId
+ * @returns {Object} Inline keyboard markup
+ */
+export function createDaySelectionKeyboard(targetId) {
+  const keyboard = [];
+
+  // Создаем кнопки для дней недели (пн-сб, пропускаем воскресенье)
+  for (let day = 1; day <= 6; day++) {
+    keyboard.push([
+      {
+        text: DAYS_FULL[day],
+        callback_data: `get_day:${targetId}:${day}`,
+      },
+    ]);
+  }
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_SETTINGS,
+      callback_data: `back_to_settings:${targetId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}

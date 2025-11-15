@@ -2,12 +2,14 @@
  * Обработчик callback query от inline кнопок
  */
 
-import {BASE_URL} from '../config/constants.js';
+import {BASE_URL, DAYS_FULL} from '../config/constants.js';
 import {MESSAGES} from '../config/messages.js';
 import {
   getFacultiesWithCache,
   getFacultyCoursesWithCache,
 } from '../services/cacheService.js';
+import {fetchTimetable, parseTimetable} from '../parsers/timetableParser.js';
+import {formatTimetableMessage} from '../utils/formatter.js';
 import {
   getChatSettings,
   getUserChats,
@@ -25,6 +27,7 @@ import {
 import {
   createChatsListKeyboard,
   createCourseSelectionKeyboard,
+  createDaySelectionKeyboard,
   createFacultySelectionKeyboard,
   createGroupSelectionKeyboard,
   createMainMenuKeyboard,
@@ -136,6 +139,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     'back_to_courses',
     'change_time',
     'change_group',
+    'get_today',
+    'select_day',
+    'get_day',
   ];
 
   // Если это действие без проверки настроек, обрабатываем его отдельно
@@ -986,6 +992,188 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
           botToken,
           callbackQuery.id,
           MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'get_today':
+      // Получение расписания на сегодня
+      try {
+        const isUserSettingsToday = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdToday = isUserSettingsToday ? targetChatId.replace('user:', '') : null;
+        
+        const settingsToday = isUserSettingsToday
+          ? await getUserSettings(kv, actualUserIdToday)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!settingsToday) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        // Проверяем, выбрана ли группа
+        if (!settingsToday.timetableUrl || !settingsToday.groupSlug) {
+          const faculties = await getFacultiesWithCache(kv);
+          
+          if (!faculties || faculties.length === 0) {
+            await answerCallbackQuery(
+              botToken,
+              callbackQuery.id,
+              MESSAGES.ERROR_NO_GROUP_SELECTED,
+              true
+            );
+            break;
+          }
+
+          await editMessage(botToken, chatId, messageId, MESSAGES.ERROR_NO_GROUP_SELECTED, {
+            reply_markup: createFacultySelectionKeyboard(targetChatId, faculties),
+          });
+          
+          await answerCallbackQuery(botToken, callbackQuery.id);
+          break;
+        }
+
+        // Получаем расписание
+        const today = new Date();
+        const html = await fetchTimetable(settingsToday.timetableUrl);
+        const timetableData = parseTimetable(html, today);
+        const timetableMessage = formatTimetableMessage(timetableData);
+
+        await editMessage(botToken, chatId, messageId, timetableMessage);
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_TIMETABLE,
+          true
+        );
+      }
+      break;
+
+    case 'select_day':
+      // Показ меню выбора дня недели
+      try {
+        const isUserSettingsDay = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdDay = isUserSettingsDay ? targetChatId.replace('user:', '') : null;
+        
+        const settingsDay = isUserSettingsDay
+          ? await getUserSettings(kv, actualUserIdDay)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!settingsDay) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        // Проверяем, выбрана ли группа
+        if (!settingsDay.timetableUrl || !settingsDay.groupSlug) {
+          const faculties = await getFacultiesWithCache(kv);
+          
+          if (!faculties || faculties.length === 0) {
+            await answerCallbackQuery(
+              botToken,
+              callbackQuery.id,
+              MESSAGES.ERROR_NO_GROUP_SELECTED,
+              true
+            );
+            break;
+          }
+
+          await editMessage(botToken, chatId, messageId, MESSAGES.ERROR_NO_GROUP_SELECTED, {
+            reply_markup: createFacultySelectionKeyboard(targetChatId, faculties),
+          });
+          
+          await answerCallbackQuery(botToken, callbackQuery.id);
+          break;
+        }
+
+        // Показываем меню выбора дня
+        await editMessage(botToken, chatId, messageId, MESSAGES.TIMETABLE_SELECT_DAY, {
+          reply_markup: createDaySelectionKeyboard(targetChatId),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'get_day':
+      // Получение расписания на выбранный день недели
+      try {
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const dayOfWeek = parseInt(parts[1] === 'user' ? parts[4] : parts[3]);
+        
+        const isUserSettingsGetDay = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdGetDay = isUserSettingsGetDay ? targetChatId.replace('user:', '') : null;
+        
+        const settingsGetDay = isUserSettingsGetDay
+          ? await getUserSettings(kv, actualUserIdGetDay)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!settingsGetDay) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        // Проверяем, выбрана ли группа
+        if (!settingsGetDay.timetableUrl || !settingsGetDay.groupSlug) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_NO_GROUP_SELECTED,
+            true
+          );
+          break;
+        }
+
+        // Находим ближайшую дату с нужным днем недели
+        const now = new Date();
+        const currentDay = now.getDay();
+        let daysToAdd = dayOfWeek - currentDay;
+        
+        // Если день уже прошел на этой неделе, берем следующую неделю
+        if (daysToAdd < 0) {
+          daysToAdd += 7;
+        }
+        
+        const targetDate = new Date(now);
+        targetDate.setDate(now.getDate() + daysToAdd);
+
+        // Получаем расписание
+        const html = await fetchTimetable(settingsGetDay.timetableUrl);
+        const timetableData = parseTimetable(html, targetDate);
+        const timetableMessage = formatTimetableMessage(timetableData);
+
+        await editMessage(botToken, chatId, messageId, timetableMessage);
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_TIMETABLE,
           true
         );
       }

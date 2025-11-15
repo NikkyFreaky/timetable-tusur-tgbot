@@ -115,11 +115,11 @@ async function handleWebhook(request, env) {
       throw new Error('BOT_TOKEN не установлен');
     }
 
-    if (!env.SETTINGS_KV) {
-      throw new Error('SETTINGS_KV не настроен');
+    if (!env['timetable-tgbot-kv']) {
+      throw new Error('timetable-tgbot-kv не настроен');
     }
 
-    await handleUpdate(update, env.BOT_TOKEN, env.SETTINGS_KV);
+    await handleUpdate(update, env.BOT_TOKEN, env['timetable-tgbot-kv']);
 
     return new Response(JSON.stringify({ok: true}), {
       status: 200,
@@ -191,8 +191,8 @@ async function handleScheduledTimetable(request, env) {
       throw new Error('BOT_TOKEN не установлен');
     }
 
-    if (!env.SETTINGS_KV) {
-      throw new Error('SETTINGS_KV не настроен');
+    if (!env['timetable-tgbot-kv']) {
+      throw new Error('timetable-tgbot-kv не настроен');
     }
 
     const now = new Date();
@@ -213,8 +213,8 @@ async function handleScheduledTimetable(request, env) {
     }
 
     // Получаем все активные чаты и пользователей
-    const activeChats = await getAllActiveChats(env.SETTINGS_KV);
-    const activeUsers = await getAllActiveUsers(env.SETTINGS_KV);
+    const activeChats = await getAllActiveChats(env['timetable-tgbot-kv']);
+    const activeUsers = await getAllActiveUsers(env['timetable-tgbot-kv']);
 
     if (activeChats.length === 0 && activeUsers.length === 0) {
       return new Response(
