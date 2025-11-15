@@ -10,22 +10,30 @@ const BASE_URL = 'https://timetable.tusur.ru';
  * @returns {string} Декодированный текст
  */
 function decodeHtmlEntities(text) {
-  const entities = {
-    '&quot;': '"',
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&nbsp;': ' ',
-    '&#39;': "'",
-    '&laquo;': '«',
-    '&raquo;': '»',
-    '&mdash;': '—',
-    '&ndash;': '–',
-  };
+  if (!text) return text;
 
-  return text.replace(/&[a-z]+;|&#\d+;/gi, (match) => {
-    return entities[match] || match;
-  });
+  // Заменяем все известные HTML-сущности
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#38;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&#60;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#62;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#160;/g, ' ')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&laquo;/g, '«')
+    .replace(/&#171;/g, '«')
+    .replace(/&raquo;/g, '»')
+    .replace(/&#187;/g, '»')
+    .replace(/&mdash;/g, '—')
+    .replace(/&#8212;/g, '—')
+    .replace(/&ndash;/g, '–')
+    .replace(/&#8211;/g, '–');
 }
 
 /**
@@ -38,7 +46,7 @@ export async function getFaculties() {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const html = await response.text();
     return parseFaculties(html);
   } catch (error) {
@@ -54,33 +62,35 @@ export async function getFaculties() {
  */
 function parseFaculties(html) {
   const faculties = [];
-  
+
   // Ищем список факультетов в HTML
   // Паттерн: <li><a href="/faculties/SLUG">Название факультета</a></li>
-  const listMatch = html.match(/<h1[^>]*>Список факультетов<\/h1>([\s\S]*?)<\/ul>/i);
-  
+  const listMatch = html.match(
+    /<h1[^>]*>Список факультетов<\/h1>([\s\S]*?)<\/ul>/i
+  );
+
   if (!listMatch) {
     console.error('Не удалось найти список факультетов');
     return faculties;
   }
-  
+
   const listHtml = listMatch[1];
-  
+
   // Извлекаем все ссылки на факультеты
   const linkPattern = /<a\s+href="\/faculties\/([^"]+)"[^>]*>([^<]+)<\/a>/gi;
   let match;
-  
+
   while ((match = linkPattern.exec(listHtml)) !== null) {
     const slug = match[1];
     const name = decodeHtmlEntities(match[2].trim());
-    
+
     faculties.push({
       name: name,
       slug: slug,
       url: `${BASE_URL}/faculties/${slug}`,
     });
   }
-  
+
   return faculties;
 }
 
@@ -95,11 +105,14 @@ export async function getFacultyCourses(facultySlug) {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const html = await response.text();
     return parseFacultyCourses(html, facultySlug);
   } catch (error) {
-    console.error(`Ошибка при получении курсов факультета ${facultySlug}:`, error);
+    console.error(
+      `Ошибка при получении курсов факультета ${facultySlug}:`,
+      error
+    );
     throw error;
   }
 }
@@ -112,18 +125,19 @@ export async function getFacultyCourses(facultySlug) {
  */
 function parseFacultyCourses(html, facultySlug) {
   const courses = {};
-  
+
   // Ищем заголовки курсов: <h2>1 курс</h2>, <h2>2 курс</h2> и т.д.
-  const coursePattern = /<h2[^>]*>(\d+)\s*курс<\/h2>([\s\S]*?)(?=<h2|<\/div>|$)/gi;
+  const coursePattern =
+    /<h2[^>]*>(\d+)\s*курс<\/h2>([\s\S]*?)(?=<h2|<\/div>|$)/gi;
   let match;
-  
+
   while ((match = coursePattern.exec(html)) !== null) {
     const courseNumber = match[1];
     const courseHtml = match[2];
-    
+
     // Извлекаем группы для этого курса
     const groups = parseGroups(courseHtml, facultySlug);
-    
+
     if (groups.length > 0) {
       courses[courseNumber] = {
         number: courseNumber,
@@ -132,7 +146,7 @@ function parseFacultyCourses(html, facultySlug) {
       };
     }
   }
-  
+
   return courses;
 }
 
@@ -144,22 +158,23 @@ function parseFacultyCourses(html, facultySlug) {
  */
 function parseGroups(html, facultySlug) {
   const groups = [];
-  
+
   // Паттерн для ссылок на группы: <a href="/faculties/SLUG/groups/GROUP">GROUP</a>
-  const groupPattern = /<a\s+href="\/faculties\/[^\/]+\/groups\/([^"]+)"[^>]*>([^<]+)<\/a>/gi;
+  const groupPattern =
+    /<a\s+href="\/faculties\/[^\/]+\/groups\/([^"]+)"[^>]*>([^<]+)<\/a>/gi;
   let match;
-  
+
   while ((match = groupPattern.exec(html)) !== null) {
     const groupSlug = match[1];
     const groupName = decodeHtmlEntities(match[2].trim());
-    
+
     groups.push({
       name: groupName,
       slug: groupSlug,
       url: `${BASE_URL}/faculties/${facultySlug}/groups/${groupSlug}`,
     });
   }
-  
+
   return groups;
 }
 
@@ -171,7 +186,7 @@ export async function getFullStructure() {
   try {
     const faculties = await getFaculties();
     const result = [];
-    
+
     for (const faculty of faculties) {
       try {
         const courses = await getFacultyCourses(faculty.slug);
@@ -180,11 +195,14 @@ export async function getFullStructure() {
           courses: courses,
         });
       } catch (error) {
-        console.error(`Ошибка при обработке факультета ${faculty.name}:`, error);
+        console.error(
+          `Ошибка при обработке факультета ${faculty.name}:`,
+          error
+        );
         // Продолжаем обработку остальных факультетов
       }
     }
-    
+
     return result;
   } catch (error) {
     console.error('Ошибка при получении полной структуры:', error);
@@ -232,13 +250,21 @@ export async function getCachedFaculties(kv) {
  * @param {number} ttl - Время жизни кэша в секундах (по умолчанию 24 часа)
  * @returns {Promise<void>}
  */
-export async function cacheFacultyCourses(kv, facultySlug, courses, ttl = 86400) {
+export async function cacheFacultyCourses(
+  kv,
+  facultySlug,
+  courses,
+  ttl = 86400
+) {
   try {
     await kv.put(`faculty_courses:${facultySlug}`, JSON.stringify(courses), {
       expirationTtl: ttl,
     });
   } catch (error) {
-    console.error(`Ошибка при кэшировании курсов факультета ${facultySlug}:`, error);
+    console.error(
+      `Ошибка при кэшировании курсов факультета ${facultySlug}:`,
+      error
+    );
   }
 }
 
@@ -253,7 +279,10 @@ export async function getCachedFacultyCourses(kv, facultySlug) {
     const cached = await kv.get(`faculty_courses:${facultySlug}`, 'json');
     return cached;
   } catch (error) {
-    console.error(`Ошибка при получении курсов факультета ${facultySlug} из кэша:`, error);
+    console.error(
+      `Ошибка при получении курсов факультета ${facultySlug} из кэша:`,
+      error
+    );
     return null;
   }
 }
@@ -266,14 +295,14 @@ export async function getCachedFacultyCourses(kv, facultySlug) {
 export async function getFacultiesWithCache(kv) {
   // Сначала пытаемся получить из кэша
   let faculties = await getCachedFaculties(kv);
-  
+
   if (!faculties) {
     // Если в кэше нет, получаем с сайта
     faculties = await getFaculties();
     // Кэшируем на 24 часа
     await cacheFaculties(kv, faculties);
   }
-  
+
   return faculties;
 }
 
@@ -286,14 +315,13 @@ export async function getFacultiesWithCache(kv) {
 export async function getFacultyCoursesWithCache(kv, facultySlug) {
   // Сначала пытаемся получить из кэша
   let courses = await getCachedFacultyCourses(kv, facultySlug);
-  
+
   if (!courses) {
     // Если в кэше нет, получаем с сайта
     courses = await getFacultyCourses(facultySlug);
     // Кэшируем на 24 часа
     await cacheFacultyCourses(kv, facultySlug, courses);
   }
-  
+
   return courses;
 }
-
