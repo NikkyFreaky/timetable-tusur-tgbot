@@ -1,3 +1,10 @@
 name = "timetable-425m-tgbot"
-main = "worker.js"
+main = "src/worker.js"
 compatibility_date = "2025-11-14"
+
+kv_namespaces = [
+  { binding = "SETTINGS_KV", id = "047f76ccf83b42528f0695fb1295f5f0" }
+]
+
+[triggers]
+crons = ["30 1 * * *"]
