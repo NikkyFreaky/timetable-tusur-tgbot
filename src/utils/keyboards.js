@@ -16,18 +16,6 @@ export function createSettingsKeyboard(chatId, settings, showBackButton = false)
   const keyboard = [
     [
       {
-        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
-        callback_data: `get_today:${chatId}`,
-      },
-    ],
-    [
-      {
-        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
-        callback_data: `select_day:${chatId}`,
-      },
-    ],
-    [
-      {
         text: settings.enabled
           ? MESSAGES.BUTTON_ENABLED
           : MESSAGES.BUTTON_DISABLED,
@@ -151,6 +139,32 @@ export function createMainMenuKeyboard(userId) {
       {
         text: MESSAGES.BUTTON_GROUP_CHATS,
         callback_data: `group_chats:${userId}`,
+      },
+    ],
+  ];
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает клавиатуру для группового чата
+ * @param {string} chatId - ID чата
+ * @returns {Object} Inline keyboard markup
+ */
+export function createGroupChatKeyboard(chatId) {
+  const keyboard = [
+    [
+      {
+        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
+        callback_data: `get_today:${chatId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
+        callback_data: `select_day:${chatId}`,
       },
     ],
   ];

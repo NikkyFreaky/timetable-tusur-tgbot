@@ -18,6 +18,7 @@ import {
   createChatsListKeyboard,
   createDaySelectionKeyboard,
   createFacultySelectionKeyboard,
+  createGroupChatKeyboard,
   createMainMenuKeyboard,
   createSettingsKeyboard,
   createUserSettingsKeyboard,
@@ -49,38 +50,47 @@ export async function handleStartCommand(message, botToken, kv) {
       reply_markup: createMainMenuKeyboard(userId.toString()),
     });
   } else {
-    // В групповом чате инициализируем настройки
-    const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
+    // В групповом чате показываем меню с расписанием
+    // Проверяем, инициализирован ли чат
+    let settings = await getChatSettings(kv, chatId.toString());
+    
+    if (!settings) {
+      // Если настройки не найдены, инициализируем их (только для админов)
+      const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
 
-    if (!isAdmin) {
-      await sendMessage(botToken, chatId, MESSAGES.ERROR_ADMIN_ONLY, {
-        message_thread_id: message.message_thread_id,
-      });
-      return;
-    }
-
-    // Получаем информацию о чате
-    const chatInfo = await getChatInfo(botToken, chatId);
-    const chatName = chatInfo?.title || `${MESSAGES.CHAT_PREFIX} ${chatId}`;
-
-    const settings = await initializeChatSettings(
-      kv,
-      chatId.toString(),
-      userId.toString(),
-      {
-        chatName: chatName,
+      if (!isAdmin) {
+        await sendMessage(botToken, chatId, MESSAGES.ERROR_ADMIN_ONLY, {
+          message_thread_id: message.message_thread_id,
+        });
+        return;
       }
-    );
 
-    if (settings) {
-      await sendMessage(botToken, chatId, MESSAGES.BOT_CONFIGURED, {
-        message_thread_id: message.message_thread_id,
-      });
-    } else {
-      await sendMessage(botToken, chatId, MESSAGES.ERROR_BOT_SETUP, {
-        message_thread_id: message.message_thread_id,
-      });
+      // Получаем информацию о чате
+      const chatInfo = await getChatInfo(botToken, chatId);
+      const chatName = chatInfo?.title || `${MESSAGES.CHAT_PREFIX} ${chatId}`;
+
+      settings = await initializeChatSettings(
+        kv,
+        chatId.toString(),
+        userId.toString(),
+        {
+          chatName: chatName,
+        }
+      );
+
+      if (!settings) {
+        await sendMessage(botToken, chatId, MESSAGES.ERROR_BOT_SETUP, {
+          message_thread_id: message.message_thread_id,
+        });
+        return;
+      }
     }
+
+    // Показываем меню с кнопками расписания (доступно всем пользователям)
+    await sendMessage(botToken, chatId, MESSAGES.GROUP_CHAT_MENU, {
+      reply_markup: createGroupChatKeyboard(chatId.toString()),
+      message_thread_id: message.message_thread_id,
+    });
   }
 }
 
