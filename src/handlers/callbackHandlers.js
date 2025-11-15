@@ -71,6 +71,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
   const message = callbackQuery.message;
   const chatId = message.chat.id;
   const messageId = message.message_id;
+  const isPrivateChat = message.chat.type === 'private';
 
   const parts = data.split(':');
   const action = parts[0];
@@ -108,7 +109,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await saveChatSettings(kv, targetChatId, settings);
 
       await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings),
+        reply_markup: createSettingsKeyboard(targetChatId, settings, isPrivateChat),
       });
 
       await answerCallbackQuery(
@@ -183,7 +184,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await saveChatSettings(kv, targetChatId, settings);
 
       await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings),
+        reply_markup: createSettingsKeyboard(targetChatId, settings, isPrivateChat),
       });
 
       await answerCallbackQuery(
@@ -367,7 +368,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
           MESSAGES.SETTINGS_SELECT_PARAMETER;
 
         await editMessage(botToken, chatId, messageId, groupSuccessText, {
-          reply_markup: createSettingsKeyboard(targetChatId, settings),
+          reply_markup: createSettingsKeyboard(targetChatId, settings, isPrivateChat),
         });
 
         await answerCallbackQuery(
