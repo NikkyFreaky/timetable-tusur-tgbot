@@ -56,47 +56,24 @@ export async function sendTimetableToThread(
   date = new Date()
 ) {
   try {
-    console.log(
-      `[${new Date().toISOString()}] Начинаем получение расписания...`
-    );
-
     const html = await fetchTimetable(timetableUrl);
-    console.log(
-      `[${new Date().toISOString()}] HTML получен, начинаем парсинг...`
-    );
-
     const timetableData = parseTimetable(html, date);
-    console.log(`[${new Date().toISOString()}] Парсинг завершен:`, {
-      weekType: timetableData.weekType,
-      date: timetableData.date,
-      lessonsCount: timetableData.lessons?.length || 0,
-    });
-
     const message = formatTimetableMessage(timetableData);
 
     await sendTelegramMessage(botToken, chatId, threadId, message);
-    console.log(
-      `[${new Date().toISOString()}] Сообщение успешно отправлено в тему ${threadId}`
-    );
 
     return {
       success: true,
       data: timetableData,
     };
   } catch (error) {
-    console.error(
-      `[${new Date().toISOString()}] Ошибка при отправке расписания:`,
-      error
-    );
+    console.error('Ошибка при отправке расписания:', error.message);
 
     try {
       const errorMessage = formatErrorMessage();
       await sendTelegramMessage(botToken, chatId, threadId, errorMessage);
     } catch (sendError) {
-      console.error(
-        `[${new Date().toISOString()}] Не удалось отправить сообщение об ошибке:`,
-        sendError
-      );
+      console.error('Не удалось отправить сообщение об ошибке');
     }
 
     return {
