@@ -3,6 +3,10 @@
  */
 
 import {
+  getFacultiesWithCache,
+  getFacultyCoursesWithCache,
+} from './facultyParser.js';
+import {
   getChatSettings,
   getUserChats,
   initializeChatSettings,
@@ -172,8 +176,8 @@ function createSettingsKeyboard(chatId, settings) {
     ],
     [
       {
-        text: 'Изменить URL расписания',
-        callback_data: `change_url:${chatId}`,
+        text: 'Выбрать группу',
+        callback_data: `change_group:${chatId}`,
       },
     ],
     [
@@ -241,6 +245,137 @@ function createThreadSelectionKeyboard(chatId, forumTopics) {
     {
       text: 'Назад к настройкам',
       callback_data: `back_to_settings:${chatId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает inline клавиатуру для выбора факультета
+ * @param {string} chatId - ID чата
+ * @param {Array} faculties - Список факультетов
+ * @returns {Object} Inline keyboard markup
+ */
+function createFacultySelectionKeyboard(chatId, faculties) {
+  const keyboard = [];
+
+  // Группируем факультеты по 1 в ряд для удобства
+  for (const faculty of faculties) {
+    keyboard.push([
+      {
+        text: faculty.name,
+        callback_data: `select_faculty:${chatId}:${faculty.slug}`,
+      },
+    ]);
+  }
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: 'Назад к настройкам',
+      callback_data: `back_to_settings:${chatId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает inline клавиатуру для выбора курса
+ * @param {string} chatId - ID чата
+ * @param {string} facultySlug - Slug факультета
+ * @param {Object} courses - Объект с курсами
+ * @returns {Object} Inline keyboard markup
+ */
+function createCourseSelectionKeyboard(chatId, facultySlug, courses) {
+  const keyboard = [];
+
+  // Сортируем курсы по номеру
+  const sortedCourses = Object.values(courses).sort(
+    (a, b) => parseInt(a.number) - parseInt(b.number)
+  );
+
+  // Группируем курсы по 2 в ряд
+  for (let i = 0; i < sortedCourses.length; i += 2) {
+    const row = [];
+
+    row.push({
+      text: `${sortedCourses[i].number} курс`,
+      callback_data: `select_course:${chatId}:${facultySlug}:${sortedCourses[i].number}`,
+    });
+
+    if (i + 1 < sortedCourses.length) {
+      row.push({
+        text: `${sortedCourses[i + 1].number} курс`,
+        callback_data: `select_course:${chatId}:${facultySlug}:${
+          sortedCourses[i + 1].number
+        }`,
+      });
+    }
+
+    keyboard.push(row);
+  }
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: 'Назад к факультетам',
+      callback_data: `back_to_faculties:${chatId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает inline клавиатуру для выбора группы
+ * @param {string} chatId - ID чата
+ * @param {string} facultySlug - Slug факультета
+ * @param {string} courseNumber - Номер курса
+ * @param {Array} groups - Список групп
+ * @returns {Object} Inline keyboard markup
+ */
+function createGroupSelectionKeyboard(
+  chatId,
+  facultySlug,
+  courseNumber,
+  groups
+) {
+  const keyboard = [];
+
+  // Группируем группы по 2 в ряд
+  for (let i = 0; i < groups.length; i += 2) {
+    const row = [];
+
+    row.push({
+      text: groups[i].name,
+      callback_data: `select_group:${chatId}:${facultySlug}:${groups[i].slug}`,
+    });
+
+    if (i + 1 < groups.length) {
+      row.push({
+        text: groups[i + 1].name,
+        callback_data: `select_group:${chatId}:${facultySlug}:${
+          groups[i + 1].slug
+        }`,
+      });
+    }
+
+    keyboard.push(row);
+  }
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: 'Назад к курсам',
+      callback_data: `back_to_courses:${chatId}:${facultySlug}`,
     },
   ]);
 
@@ -397,13 +532,17 @@ export async function handleSettingsCommand(message, botToken, kv) {
       ? `ID: ${settings.threadId}`
       : 'Не установлена';
 
+    const groupDisplay = settings.groupSlug
+      ? settings.groupSlug.toUpperCase()
+      : 'Не выбрана';
+
     const text =
       '<b>Настройки чата</b>\n\n' +
       `<b>Название чата:</b> ${
         settings.chatName || `ID: ${settings.chatId}`
       }\n` +
       `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
-      `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
+      `<b>Группа:</b> ${groupDisplay}\n` +
       `<b>Тема (thread):</b> ${threadDisplay}\n\n` +
       'Выберите параметр для изменения:';
 
@@ -487,10 +626,14 @@ export async function handleStatusCommand(message, botToken, kv) {
       return;
     }
 
+    const statusGroupDisplay = settings.groupSlug
+      ? settings.groupSlug.toUpperCase()
+      : 'Не выбрана';
+
     const text =
       '<b>Статус бота</b>\n\n' +
       `Статус: ${settings.enabled ? 'Активен' : 'Выключен'}\n` +
-      `URL расписания: ${settings.timetableUrl}\n` +
+      `Группа: ${statusGroupDisplay}\n` +
       `Тема (thread): ${settings.threadId || 'Не установлена'}\n` +
       `Создан: ${new Date(settings.createdAt).toLocaleString('ru-RU')}\n` +
       `Обновлен: ${new Date(settings.updatedAt).toLocaleString('ru-RU')}`;
@@ -556,13 +699,17 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         ? `ID: ${settings.threadId}`
         : 'Не установлена';
 
+      const statusGroupDisplay = settings.groupSlug
+        ? settings.groupSlug.toUpperCase()
+        : 'Не выбрана';
+
       const statusText =
         '<b>Настройки чата</b>\n\n' +
         `<b>Название чата:</b> ${
           settings.chatName || `ID: ${settings.chatId}`
         }\n` +
         `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
-        `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
+        `<b>Группа:</b> ${statusGroupDisplay}\n` +
         `<b>Тема (thread):</b> ${statusThreadDisplay}\n\n` +
         'Выберите параметр для изменения:';
 
@@ -583,6 +730,29 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         callbackQuery.id,
         'Отправьте новый URL расписания в формате: /seturl <URL>'
       );
+      break;
+
+    case 'change_group':
+      // Показываем список факультетов
+      try {
+        const faculties = await getFacultiesWithCache(kv);
+        const facultiesText =
+          '<b>Выбор группы</b>\n\n' + 'Шаг 1 из 3: Выберите факультет';
+
+        await editMessage(botToken, chatId, messageId, facultiesText, {
+          reply_markup: createFacultySelectionKeyboard(targetChatId, faculties),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при получении списка факультетов:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          'Ошибка при загрузке списка факультетов',
+          true
+        );
+      }
       break;
 
     case 'change_thread':
@@ -608,13 +778,17 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         ? `ID: ${settings.threadId}`
         : 'Не установлена';
 
+      const selectChatGroupDisplay = settings.groupSlug
+        ? settings.groupSlug.toUpperCase()
+        : 'Не выбрана';
+
       const chatText =
         '<b>Настройки чата</b>\n\n' +
         `<b>Название чата:</b> ${
           settings.chatName || `ID: ${settings.chatId}`
         }\n` +
         `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
-        `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
+        `<b>Группа:</b> ${selectChatGroupDisplay}\n` +
         `<b>Тема (thread):</b> ${threadDisplay}\n\n` +
         'Выберите параметр для изменения:';
 
@@ -639,13 +813,17 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         ? `${settings.threadName} (ID: ${settings.threadId})`
         : `ID: ${settings.threadId}`;
 
+      const successGroupDisplay = settings.groupSlug
+        ? settings.groupSlug.toUpperCase()
+        : 'Не выбрана';
+
       const successText =
         '<b>Настройки чата</b>\n\n' +
         `<b>Название чата:</b> ${
           settings.chatName || `ID: ${settings.chatId}`
         }\n` +
         `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
-        `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
+        `<b>Группа:</b> ${successGroupDisplay}\n` +
         `<b>Тема (thread):</b> ${successThreadDisplay}\n\n` +
         'Выберите параметр для изменения:';
 
@@ -668,13 +846,17 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         ? `ID: ${settings.threadId}`
         : 'Не установлена';
 
+      const backGroupDisplay = settings.groupSlug
+        ? settings.groupSlug.toUpperCase()
+        : 'Не выбрана';
+
       const backText =
         '<b>Настройки чата</b>\n\n' +
         `<b>Название чата:</b> ${
           settings.chatName || `ID: ${settings.chatId}`
         }\n` +
         `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
-        `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
+        `<b>Группа:</b> ${backGroupDisplay}\n` +
         `<b>Тема (thread):</b> ${backThreadDisplay}\n\n` +
         'Выберите параметр для изменения:';
 
@@ -692,6 +874,208 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         'Нет доступных тем. Отправьте команду /setthread в нужной теме чата.',
         true
       );
+      break;
+
+    case 'select_faculty':
+      // Выбор факультета - показываем курсы
+      try {
+        const facultySlug = parts[2];
+        const courses = await getFacultyCoursesWithCache(kv, facultySlug);
+
+        if (!courses || Object.keys(courses).length === 0) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            'На этом факультете нет доступных курсов',
+            true
+          );
+          break;
+        }
+
+        const coursesText =
+          '<b>Выбор группы</b>\n\n' + 'Шаг 2 из 3: Выберите курс';
+
+        await editMessage(botToken, chatId, messageId, coursesText, {
+          reply_markup: createCourseSelectionKeyboard(
+            targetChatId,
+            facultySlug,
+            courses
+          ),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при получении списка курсов:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          'Ошибка при загрузке списка курсов',
+          true
+        );
+      }
+      break;
+
+    case 'select_course':
+      // Выбор курса - показываем группы
+      try {
+        const courseFacultySlug = parts[2];
+        const courseNumber = parts[3];
+        const coursesData = await getFacultyCoursesWithCache(
+          kv,
+          courseFacultySlug
+        );
+
+        if (!coursesData || !coursesData[courseNumber]) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            'Курс не найден',
+            true
+          );
+          break;
+        }
+
+        const groups = coursesData[courseNumber].groups;
+
+        if (!groups || groups.length === 0) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            'На этом курсе нет доступных групп',
+            true
+          );
+          break;
+        }
+
+        const groupsText =
+          '<b>Выбор группы</b>\n\n' + 'Шаг 3 из 3: Выберите группу';
+
+        await editMessage(botToken, chatId, messageId, groupsText, {
+          reply_markup: createGroupSelectionKeyboard(
+            targetChatId,
+            courseFacultySlug,
+            courseNumber,
+            groups
+          ),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при получении списка групп:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          'Ошибка при загрузке списка групп',
+          true
+        );
+      }
+      break;
+
+    case 'select_group':
+      // Выбор группы - сохраняем в настройки
+      try {
+        const groupFacultySlug = parts[2];
+        const groupSlug = parts[3];
+        const groupUrl = `https://timetable.tusur.ru/faculties/${groupFacultySlug}/groups/${groupSlug}`;
+
+        settings.timetableUrl = groupUrl;
+        settings.groupSlug = groupSlug;
+        settings.facultySlug = groupFacultySlug;
+        await saveChatSettings(kv, targetChatId, settings);
+
+        const groupThreadDisplay = settings.threadName
+          ? `${settings.threadName} (ID: ${settings.threadId})`
+          : settings.threadId
+          ? `ID: ${settings.threadId}`
+          : 'Не установлена';
+
+        const groupSuccessText =
+          '<b>Настройки чата</b>\n\n' +
+          `<b>Название чата:</b> ${
+            settings.chatName || `ID: ${settings.chatId}`
+          }\n` +
+          `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
+          `<b>Группа:</b> ${groupSlug.toUpperCase()}\n` +
+          `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
+          `<b>Тема (thread):</b> ${groupThreadDisplay}\n\n` +
+          'Выберите параметр для изменения:';
+
+        await editMessage(botToken, chatId, messageId, groupSuccessText, {
+          reply_markup: createSettingsKeyboard(targetChatId, settings),
+        });
+
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          `Группа ${groupSlug.toUpperCase()} выбрана`
+        );
+      } catch (error) {
+        console.error('Ошибка при сохранении группы:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          'Ошибка при сохранении группы',
+          true
+        );
+      }
+      break;
+
+    case 'back_to_faculties':
+      // Возврат к списку факультетов
+      try {
+        const backFaculties = await getFacultiesWithCache(kv);
+        const backFacultiesText =
+          '<b>Выбор группы</b>\n\n' + 'Шаг 1 из 3: Выберите факультет';
+
+        await editMessage(botToken, chatId, messageId, backFacultiesText, {
+          reply_markup: createFacultySelectionKeyboard(
+            targetChatId,
+            backFaculties
+          ),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при возврате к факультетам:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          'Ошибка при загрузке',
+          true
+        );
+      }
+      break;
+
+    case 'back_to_courses':
+      // Возврат к списку курсов
+      try {
+        const backFacultySlug = parts[2];
+        const backCourses = await getFacultyCoursesWithCache(
+          kv,
+          backFacultySlug
+        );
+
+        const backCoursesText =
+          '<b>Выбор группы</b>\n\n' + 'Шаг 2 из 3: Выберите курс';
+
+        await editMessage(botToken, chatId, messageId, backCoursesText, {
+          reply_markup: createCourseSelectionKeyboard(
+            targetChatId,
+            backFacultySlug,
+            backCourses
+          ),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при возврате к курсам:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          'Ошибка при загрузке',
+          true
+        );
+      }
       break;
 
     default:
