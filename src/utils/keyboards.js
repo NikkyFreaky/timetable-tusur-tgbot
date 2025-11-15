@@ -139,6 +139,14 @@ export function createChatsListKeyboard(chats) {
     },
   ]);
 
+  // Добавляем кнопку "Назад в главное меню"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_MAIN,
+      callback_data: `back_to_main:0`,
+    },
+  ]);
+
   return {
     inline_keyboard: keyboard,
   };

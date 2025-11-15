@@ -119,6 +119,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     'group_chats',
     'back_to_main',
     'back_to_chats',
+    'back_to_settings',
+    'select_chat',
   ];
 
   // Если это действие без проверки настроек, обрабатываем его отдельно
@@ -258,12 +260,34 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       break;
 
     case 'select_chat':
-      // Показываем настройки с кнопкой "Назад" (так как это личные сообщения)
-      await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings, true),
-      });
+      // Показываем настройки выбранного чата с кнопкой "Назад" (так как это личные сообщения)
+      try {
+        const chatSettings = await getChatSettings(kv, targetChatId);
+        
+        if (!chatSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
 
-      await answerCallbackQuery(botToken, callbackQuery.id);
+        await editMessage(botToken, chatId, messageId, formatSettingsText(chatSettings), {
+          reply_markup: createSettingsKeyboard(targetChatId, chatSettings, true),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при открытии настроек чата:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
       break;
 
     case 'select_thread':
@@ -290,11 +314,47 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
     case 'back_to_settings':
       // Возврат к настройкам (с кнопкой "Назад" если это личные сообщения)
-      await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings, true),
-      });
+      try {
+        // Определяем тип настроек
+        const isUserSettingsBack = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdBack = isUserSettingsBack ? targetChatId.replace('user:', '') : null;
+        
+        const settingsBack = isUserSettingsBack
+          ? await getUserSettings(kv, actualUserIdBack)
+          : await getChatSettings(kv, targetChatId);
 
-      await answerCallbackQuery(botToken, callbackQuery.id);
+        if (!settingsBack) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        const textBack = isUserSettingsBack
+          ? formatUserSettingsText(settingsBack)
+          : formatSettingsText(settingsBack);
+        
+        const keyboardBack = isUserSettingsBack
+          ? createUserSettingsKeyboard(actualUserIdBack, settingsBack)
+          : createSettingsKeyboard(targetChatId, settingsBack, true);
+
+        await editMessage(botToken, chatId, messageId, textBack, {
+          reply_markup: keyboardBack,
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при возврате к настройкам:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
       break;
 
     case 'back_to_chats':
