@@ -12,6 +12,7 @@ import {
 } from './commandHandlers.js';
 import {handleCallbackQuery} from './callbackHandlers.js';
 import {getChatSettings, saveChatSettings} from '../services/settingsService.js';
+import {MESSAGES} from '../config/messages.js';
 
 /**
  * Обновляет кэш топиков форума при получении сообщения
@@ -22,7 +23,7 @@ import {getChatSettings, saveChatSettings} from '../services/settingsService.js'
 async function updateForumTopicsCache(message, kv) {
   try {
     // Проверяем, является ли это сообщением из топика
-    if (!message.message_thread_id || !message.is_topic_message) {
+    if (!message.message_thread_id) {
       return;
     }
 
@@ -35,29 +36,43 @@ async function updateForumTopicsCache(message, kv) {
       return;
     }
 
-    // Пытаемся получить название темы
+    // Инициализируем объект тем, если его нет
+    if (!settings.forumTopics) {
+      settings.forumTopics = {};
+    }
+
+    // Пытаемся получить название темы из разных источников
     let threadName = null;
 
-    // Если это сообщение о создании топика
+    // 1. Если это сообщение о создании топика
     if (message.forum_topic_created) {
       threadName = message.forum_topic_created.name;
     }
-    // Если это ответ на сообщение с информацией о топике
+    // 2. Если это ответ на сообщение с информацией о топике
     else if (message.reply_to_message?.forum_topic_created) {
       threadName = message.reply_to_message.forum_topic_created.name;
     }
-    // Если название уже есть в кэше, не обновляем
-    else if (settings.forumTopics?.[threadId]) {
-      return;
+    // 3. Проверяем, есть ли название в самом объекте сообщения
+    else if (message.forum_topic_edited) {
+      threadName = message.forum_topic_edited.name;
+    }
+    // 4. Если в сообщении есть информация о чате с is_forum
+    else if (message.chat?.is_forum && message.is_topic_message) {
+      // Используем существующее название из кэша или создаем временное
+      threadName = settings.forumTopics[threadId] || null;
     }
 
     // Если получили название, обновляем кэш
-    if (threadName) {
-      if (!settings.forumTopics) {
-        settings.forumTopics = {};
-      }
+    if (threadName && threadName !== settings.forumTopics[threadId]) {
       settings.forumTopics[threadId] = threadName;
       await saveChatSettings(kv, chatId, settings);
+      console.log(`Обновлено название темы ${threadId}: ${threadName}`);
+    }
+    // Если название не получили, но темы еще нет в кэше, добавляем с ID
+    else if (!settings.forumTopics[threadId]) {
+      settings.forumTopics[threadId] = `${MESSAGES.TOPIC_PREFIX} ${threadId}`;
+      await saveChatSettings(kv, chatId, settings);
+      console.log(`Добавлена тема с ID: ${threadId}`);
     }
   } catch (error) {
     console.error('Ошибка при обновлении кэша топиков:', error);
@@ -101,4 +116,5 @@ export async function handleUpdate(update, botToken, kv) {
     console.error('Ошибка при обработке команды:', error);
   }
 }
+
 

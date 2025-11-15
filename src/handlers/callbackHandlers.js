@@ -10,6 +10,7 @@ import {
 } from '../services/cacheService.js';
 import {
   getChatSettings,
+  getUserChats,
   isUserAdmin,
   saveChatSettings,
 } from '../services/settingsService.js';
@@ -19,6 +20,7 @@ import {
   editMessage,
 } from '../utils/telegramApi.js';
 import {
+  createChatsListKeyboard,
   createCourseSelectionKeyboard,
   createFacultySelectionKeyboard,
   createGroupSelectionKeyboard,
@@ -161,8 +163,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       break;
 
     case 'select_chat':
+      // Показываем настройки с кнопкой "Назад" (так как это личные сообщения)
       await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings),
+        reply_markup: createSettingsKeyboard(targetChatId, settings, true),
       });
 
       await answerCallbackQuery(botToken, callbackQuery.id);
@@ -191,12 +194,43 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       break;
 
     case 'back_to_settings':
-      // Возврат к настройкам
+      // Возврат к настройкам (с кнопкой "Назад" если это личные сообщения)
       await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings),
+        reply_markup: createSettingsKeyboard(targetChatId, settings, true),
       });
 
       await answerCallbackQuery(botToken, callbackQuery.id);
+      break;
+
+    case 'back_to_chats':
+      // Возврат к списку чатов
+      try {
+        const userChats = await getUserChats(kv, userId.toString());
+
+        if (userChats.length === 0) {
+          await editMessage(botToken, chatId, messageId, MESSAGES.ERROR_NO_CHATS);
+        } else {
+          await editMessage(
+            botToken,
+            chatId,
+            messageId,
+            MESSAGES.WELCOME_SELECT_CHAT,
+            {
+              reply_markup: createChatsListKeyboard(userChats),
+            }
+          );
+        }
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при возврате к списку чатов:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
       break;
 
     case 'no_threads':
