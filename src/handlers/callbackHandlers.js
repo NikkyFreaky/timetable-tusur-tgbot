@@ -113,27 +113,66 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
   const action = parts[0];
   const targetChatId = parts[1];
 
-  // Определяем, работаем ли мы с личными настройками пользователя
-  const isUserSettings = targetChatId && targetChatId.startsWith('user');
-  const actualUserId = isUserSettings ? targetChatId.replace('user:', '') : null;
+  // Действия, которые не требуют проверки прав и настроек
+  const actionsWithoutSettingsCheck = [
+    'my_settings',
+    'group_chats',
+    'back_to_main',
+    'back_to_chats',
+  ];
 
-  // Для личных настроек не проверяем права администратора
-  if (!isUserSettings) {
-    // Проверяем права администратора для групповых чатов
-    const isAdmin = await checkTelegramAdmin(botToken, targetChatId, userId);
-    const isAdminInKV = await isUserAdmin(kv, targetChatId, userId.toString());
+  // Если это действие без проверки настроек, обрабатываем его отдельно
+  if (actionsWithoutSettingsCheck.includes(action)) {
+    // Эти действия обрабатываются в switch ниже без предварительных проверок
+  } else {
+    // Определяем, работаем ли мы с личными настройками пользователя
+    const isUserSettings = targetChatId && targetChatId.startsWith('user');
+    const actualUserId = isUserSettings ? targetChatId.replace('user:', '') : null;
 
-    if (!isAdmin && !isAdminInKV) {
-      await answerCallbackQuery(
-        botToken,
-        callbackQuery.id,
-        MESSAGES.ERROR_NO_RIGHTS,
-        true
-      );
-      return;
+    // Для личных настроек не проверяем права администратора
+    if (!isUserSettings) {
+      // Проверяем права администратора для групповых чатов
+      const isAdmin = await checkTelegramAdmin(botToken, targetChatId, userId);
+      const isAdminInKV = await isUserAdmin(kv, targetChatId, userId.toString());
+
+      if (!isAdmin && !isAdminInKV) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_NO_RIGHTS,
+          true
+        );
+        return;
+      }
+
+      const settings = await getChatSettings(kv, targetChatId);
+
+      if (!settings) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+          true
+        );
+        return;
+      }
+    } else {
+      // Проверяем, что пользователь работает со своими настройками
+      if (actualUserId !== userId.toString()) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_NO_RIGHTS,
+          true
+        );
+        return;
+      }
     }
 
-    const settings = await getChatSettings(kv, targetChatId);
+    // Получаем настройки (чата или пользователя)
+    const settings = isUserSettings
+      ? await getUserSettings(kv, actualUserId)
+      : await getChatSettings(kv, targetChatId);
 
     if (!settings) {
       await answerCallbackQuery(
@@ -144,32 +183,18 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       );
       return;
     }
-  } else {
-    // Проверяем, что пользователь работает со своими настройками
-    if (actualUserId !== userId.toString()) {
-      await answerCallbackQuery(
-        botToken,
-        callbackQuery.id,
-        MESSAGES.ERROR_NO_RIGHTS,
-        true
-      );
-      return;
-    }
   }
 
-  // Получаем настройки (чата или пользователя)
-  const settings = isUserSettings
-    ? await getUserSettings(kv, actualUserId)
-    : await getChatSettings(kv, targetChatId);
-
-  if (!settings) {
-    await answerCallbackQuery(
-      botToken,
-      callbackQuery.id,
-      MESSAGES.ERROR_SETTINGS_NOT_FOUND,
-      true
-    );
-    return;
+  // Определяем параметры для использования в switch
+  const isUserSettings = targetChatId && targetChatId.startsWith('user');
+  const actualUserId = isUserSettings ? targetChatId.replace('user:', '') : null;
+  
+  // Получаем настройки для использования в switch (если они нужны)
+  let settings = null;
+  if (!actionsWithoutSettingsCheck.includes(action)) {
+    settings = isUserSettings
+      ? await getUserSettings(kv, actualUserId)
+      : await getChatSettings(kv, targetChatId);
   }
 
   switch (action) {
