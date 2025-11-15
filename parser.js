@@ -3,6 +3,36 @@
  */
 
 /**
+ * Вычисляет тип недели (чётная/нечётная) по дате
+ * @param {Date} date - Дата для вычисления
+ * @returns {string} Тип недели
+ */
+function calculateWeekType(date) {
+  // Начало учебного года (1 сентября текущего или предыдущего года)
+  const year =
+    date.getMonth() >= 8 ? date.getFullYear() : date.getFullYear() - 1;
+  const startDate = new Date(year, 8, 1); // 1 сентября
+
+  // Находим первый понедельник учебного года
+  const firstMonday = new Date(startDate);
+  const dayOfWeek = startDate.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7;
+  firstMonday.setDate(startDate.getDate() + daysUntilMonday);
+
+  // Вычисляем количество недель с начала учебного года
+  const diffTime = date.getTime() - firstMonday.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const weekNumber = Math.floor(diffDays / 7) + 1;
+
+  console.log(
+    `[DEBUG] Вычисление недели: год=${year}, первый понедельник=${firstMonday.toISOString()}, номер недели=${weekNumber}`
+  );
+
+  // Первая неделя - нечётная
+  return weekNumber % 2 === 1 ? 'нечётная' : 'чётная';
+}
+
+/**
  * Парсит HTML страницу расписания и извлекает информацию о парах
  * @param {string} html - HTML код страницы расписания
  * @param {Date} date - Дата, для которой нужно получить расписание
@@ -10,39 +40,96 @@
  */
 export function parseTimetable(html, date = new Date()) {
   // Получаем информацию о текущей неделе
-  // Ищем элемент с классами current и current-week (в любом порядке)
-  const weekMatch = html.match(
-    /<li[^>]*class=['"][^'"]*current[^'"]*current-week[^'"]*['"][^>]*>([\s\S]*?)<\/li>/i
-  ) || html.match(
-    /<li[^>]*class=['"][^'"]*current-week[^'"]*current[^'"]*['"][^>]*>([\s\S]*?)<\/li>/i
-  );
-  
+  console.log('[DEBUG] Начинаем поиск информации о неделе');
+
   let weekType = 'неизвестно';
 
-  if (weekMatch) {
-    const weekText = weekMatch[1];
-    console.log(`[DEBUG] Найден текст недели: ${weekText.substring(0, 100)}`);
+  // Метод 1: Ищем элемент с классом current-week
+  const weekMatch1 = html.match(
+    /<li[^>]*class=['"][^'"]*current-week[^'"]*['"][^>]*>([\s\S]*?)<\/li>/i
+  );
+
+  if (weekMatch1) {
+    const weekText = weekMatch1[1];
+    console.log(
+      `[DEBUG] Метод 1 - Найден текст недели: ${weekText.substring(0, 150)}`
+    );
     if (weekText.includes('чётная') || weekText.includes('четная')) {
       weekType = 'чётная';
     } else if (weekText.includes('нечётная') || weekText.includes('нечетная')) {
       weekType = 'нечётная';
     }
-  } else {
-    console.log('[DEBUG] Элемент с текущей неделей не найден, пробуем альтернативный метод');
-    // Альтернативный метод: ищем любой элемент с current-week
-    const altWeekMatch = html.match(
-      /<li[^>]*current-week[^>]*>([\s\S]*?)<\/li>/i
+  }
+
+  // Метод 2: Ищем через data-week или другие атрибуты
+  if (weekType === 'неизвестно') {
+    console.log('[DEBUG] Метод 1 не сработал, пробуем метод 2');
+    const weekMatch2 = html.match(
+      /<li[^>]*current[^>]*>([\s\S]*?)(чётная|нечётная|четная|нечетная)([\s\S]*?)<\/li>/i
     );
-    if (altWeekMatch) {
-      const weekText = altWeekMatch[1];
-      console.log(`[DEBUG] Найден текст недели (альтернативный метод): ${weekText.substring(0, 100)}`);
+    if (weekMatch2) {
+      const weekText = weekMatch2[2];
+      console.log(`[DEBUG] Метод 2 - Найден текст недели: ${weekText}`);
       if (weekText.includes('чётная') || weekText.includes('четная')) {
         weekType = 'чётная';
-      } else if (weekText.includes('нечётная') || weekText.includes('нечетная')) {
+      } else if (
+        weekText.includes('нечётная') ||
+        weekText.includes('нечетная')
+      ) {
         weekType = 'нечётная';
       }
     }
   }
+
+  // Метод 3: Ищем просто "чётная" или "нечётная" в контексте недели
+  if (weekType === 'неизвестно') {
+    console.log('[DEBUG] Метод 2 не сработал, пробуем метод 3');
+    // Ищем секцию с неделями
+    const weeksSection = html.match(
+      /<ul[^>]*class=['"][^'"]*weeks[^'"]*['"][^>]*>([\s\S]*?)<\/ul>/i
+    );
+
+    if (weeksSection) {
+      console.log(
+        `[DEBUG] Найдена секция недель, длина: ${weeksSection[1].length}`
+      );
+      // Ищем активную неделю в этой секции
+      const activeWeek =
+        weeksSection[1].match(
+          /<li[^>]*class=['"][^'"]*active[^'"]*['"][^>]*>([\s\S]*?)<\/li>/i
+        ) ||
+        weeksSection[1].match(
+          /<li[^>]*class=['"][^'"]*current[^'"]*['"][^>]*>([\s\S]*?)<\/li>/i
+        );
+
+      if (activeWeek) {
+        const weekText = activeWeek[1];
+        console.log(
+          `[DEBUG] Метод 3 - Найден текст активной недели: ${weekText.substring(
+            0,
+            150
+          )}`
+        );
+        if (weekText.includes('чётная') || weekText.includes('четная')) {
+          weekType = 'чётная';
+        } else if (
+          weekText.includes('нечётная') ||
+          weekText.includes('нечетная')
+        ) {
+          weekType = 'нечётная';
+        }
+      }
+    }
+  }
+
+  // Метод 4: Вычисляем неделю по дате (запасной вариант)
+  if (weekType === 'неизвестно') {
+    console.log('[DEBUG] Все методы не сработали, вычисляем неделю по дате');
+    weekType = calculateWeekType(date);
+    console.log(`[DEBUG] Вычисленная неделя: ${weekType}`);
+  }
+
+  console.log(`[DEBUG] Итоговый тип недели: ${weekType}`);
 
   // Форматируем дату для поиска
   const days = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
@@ -346,4 +433,3 @@ export async function fetchTimetable(url) {
     throw error;
   }
 }
-
