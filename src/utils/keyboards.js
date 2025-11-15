@@ -58,6 +58,73 @@ export function createSettingsKeyboard(chatId, settings, showBackButton = false)
 }
 
 /**
+ * Создает inline клавиатуру для настроек личных сообщений пользователя
+ * @param {string} userId - ID пользователя
+ * @param {Object} settings - Текущие настройки пользователя
+ * @returns {Object} Inline keyboard markup
+ */
+export function createUserSettingsKeyboard(userId, settings) {
+  const keyboard = [
+    [
+      {
+        text: settings.enabled
+          ? MESSAGES.BUTTON_ENABLED
+          : MESSAGES.BUTTON_DISABLED,
+        callback_data: `toggle_user_enabled:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_GROUP,
+        callback_data: `change_user_group:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_CONFIGURE_TIME,
+        callback_data: `change_user_time:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_BACK_TO_MAIN,
+        callback_data: `back_to_main:${userId}`,
+      },
+    ],
+  ];
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает главное меню для личных сообщений
+ * @param {string} userId - ID пользователя
+ * @returns {Object} Inline keyboard markup
+ */
+export function createMainMenuKeyboard(userId) {
+  const keyboard = [
+    [
+      {
+        text: MESSAGES.BUTTON_MY_SETTINGS,
+        callback_data: `my_settings:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_GROUP_CHATS,
+        callback_data: `group_chats:${userId}`,
+      },
+    ],
+  ];
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
  * Создает inline клавиатуру для выбора чата в личных сообщениях
  * @param {Array} chats - Список чатов пользователя
  * @returns {Object} Inline keyboard markup

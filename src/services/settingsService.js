@@ -3,7 +3,7 @@
  * Использует Cloudflare KV для хранения настроек
  */
 
-import {DEFAULT_CHAT_SETTINGS, KV_KEYS} from '../config/constants.js';
+import {DEFAULT_CHAT_SETTINGS, DEFAULT_USER_SETTINGS, KV_KEYS} from '../config/constants.js';
 
 /**
  * Структура настроек чата:
@@ -19,6 +19,21 @@ import {DEFAULT_CHAT_SETTINGS, KV_KEYS} from '../config/constants.js';
  *   createdAt: string,
  *   updatedAt: string,
  *   forumTopics: Object // Кэш доступных топиков форума {threadId: threadName}
+ * }
+ */
+
+/**
+ * Структура настроек пользователя (для личных сообщений):
+ * {
+ *   userId: string,
+ *   timetableUrl: string,
+ *   groupSlug: string,
+ *   facultySlug: string,
+ *   enabled: boolean,
+ *   sendHour: number,
+ *   sendMinute: number,
+ *   createdAt: string,
+ *   updatedAt: string,
  * }
  */
 
@@ -225,6 +240,105 @@ export async function initializeChatSettings(
   } catch (error) {
     console.error(`Ошибка при инициализации настроек чата ${chatId}:`, error);
     return null;
+  }
+}
+
+/**
+ * Получает настройки пользователя из KV хранилища
+ * @param {KVNamespace} kv - KV namespace
+ * @param {string} userId - ID пользователя
+ * @returns {Promise<Object|null>} Настройки пользователя или null
+ */
+export async function getUserSettings(kv, userId) {
+  try {
+    const key = `${KV_KEYS.USER_PREFIX}${userId}`;
+    const settings = await kv.get(key, 'json');
+    return settings;
+  } catch (error) {
+    console.error(`Ошибка при получении настроек пользователя ${userId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Сохраняет настройки пользователя в KV хранилище
+ * @param {KVNamespace} kv - KV namespace
+ * @param {string} userId - ID пользователя
+ * @param {Object} settings - Настройки пользователя
+ * @returns {Promise<boolean>} Успешность операции
+ */
+export async function saveUserSettings(kv, userId, settings) {
+  try {
+    const key = `${KV_KEYS.USER_PREFIX}${userId}`;
+    const settingsWithTimestamp = {
+      ...settings,
+      userId,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (!settings.createdAt) {
+      settingsWithTimestamp.createdAt = new Date().toISOString();
+    }
+
+    await kv.put(key, JSON.stringify(settingsWithTimestamp));
+    return true;
+  } catch (error) {
+    console.error(`Ошибка при сохранении настроек пользователя ${userId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Инициализирует настройки для пользователя
+ * @param {KVNamespace} kv - KV namespace
+ * @param {string} userId - ID пользователя
+ * @param {Object} initialSettings - Начальные настройки (опционально)
+ * @returns {Promise<Object|null>} Созданные настройки или null
+ */
+export async function initializeUserSettings(kv, userId, initialSettings = {}) {
+  try {
+    const existingSettings = await getUserSettings(kv, userId);
+    if (existingSettings) {
+      return existingSettings;
+    }
+
+    const defaultSettings = {
+      userId,
+      ...DEFAULT_USER_SETTINGS,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...initialSettings,
+    };
+
+    const success = await saveUserSettings(kv, userId, defaultSettings);
+    return success ? defaultSettings : null;
+  } catch (error) {
+    console.error(`Ошибка при инициализации настроек пользователя ${userId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Получает список всех активных пользователей для отправки расписания
+ * @param {KVNamespace} kv - KV namespace
+ * @returns {Promise<Array>} Список настроек активных пользователей
+ */
+export async function getAllActiveUsers(kv) {
+  try {
+    const list = await kv.list({prefix: KV_KEYS.USER_PREFIX});
+    const users = [];
+
+    for (const key of list.keys) {
+      const settings = await kv.get(key.name, 'json');
+      if (settings && settings.enabled === true) {
+        users.push(settings);
+      }
+    }
+
+    return users;
+  } catch (error) {
+    console.error('Ошибка при получении списка активных пользователей:', error);
+    return [];
   }
 }
 

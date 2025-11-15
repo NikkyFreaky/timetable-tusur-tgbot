@@ -7,12 +7,19 @@ import {MESSAGES} from '../config/messages.js';
 import {
   getChatSettings,
   getUserChats,
+  getUserSettings,
   initializeChatSettings,
+  initializeUserSettings,
   saveChatSettings,
   updateChatSetting,
 } from '../services/settingsService.js';
 import {checkTelegramAdmin, getChatInfo, sendMessage} from '../utils/telegramApi.js';
-import {createChatsListKeyboard, createSettingsKeyboard} from '../utils/keyboards.js';
+import {
+  createChatsListKeyboard,
+  createMainMenuKeyboard,
+  createSettingsKeyboard,
+  createUserSettingsKeyboard,
+} from '../utils/keyboards.js';
 
 /**
  * Обрабатывает команду /start
@@ -27,22 +34,15 @@ export async function handleStartCommand(message, botToken, kv) {
   const isPrivate = message.chat.type === CHAT_TYPES.PRIVATE;
 
   if (isPrivate) {
-    // В личных сообщениях показываем список чатов
-    const userChats = await getUserChats(kv, userId.toString());
+    // Инициализируем настройки пользователя, если их еще нет
+    await initializeUserSettings(kv, userId.toString());
 
-    let text = MESSAGES.WELCOME_PRIVATE;
+    // В личных сообщениях показываем главное меню
+    const text = MESSAGES.WELCOME_PRIVATE + MESSAGES.WELCOME_PERSONAL;
 
-    if (userChats.length === 0) {
-      text += MESSAGES.WELCOME_NO_CHATS;
-
-      await sendMessage(botToken, chatId, text);
-    } else {
-      text += MESSAGES.WELCOME_SELECT_CHAT;
-
-      await sendMessage(botToken, chatId, text, {
-        reply_markup: createChatsListKeyboard(userChats),
-      });
-    }
+    await sendMessage(botToken, chatId, text, {
+      reply_markup: createMainMenuKeyboard(userId.toString()),
+    });
   } else {
     // В групповом чате инициализируем настройки
     const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
@@ -92,16 +92,11 @@ export async function handleSettingsCommand(message, botToken, kv) {
   const isPrivate = message.chat.type === CHAT_TYPES.PRIVATE;
 
   if (isPrivate) {
-    // В личных сообщениях показываем список чатов
-    const userChats = await getUserChats(kv, userId.toString());
+    // В личных сообщениях показываем главное меню
+    const text = MESSAGES.WELCOME_PRIVATE + MESSAGES.WELCOME_PERSONAL;
 
-    if (userChats.length === 0) {
-      await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_CHATS);
-      return;
-    }
-
-    await sendMessage(botToken, chatId, MESSAGES.SETTINGS_SELECT_CHAT, {
-      reply_markup: createChatsListKeyboard(userChats),
+    await sendMessage(botToken, chatId, text, {
+      reply_markup: createMainMenuKeyboard(userId.toString()),
     });
   } else {
     // В групповом чате показываем настройки

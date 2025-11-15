@@ -5,9 +5,9 @@
 import {DEBOUNCE_MS} from './config/constants.js';
 import {handleUpdate} from './handlers/updateHandler.js';
 import {formatErrorMessage, formatTimetableMessage} from './utils/formatter.js';
-import {sendTelegramMessage} from './utils/telegramApi.js';
+import {sendMessage, sendTelegramMessage} from './utils/telegramApi.js';
 import {fetchTimetable, parseTimetable} from './parsers/timetableParser.js';
-import {getAllActiveChats} from './services/settingsService.js';
+import {getAllActiveChats, getAllActiveUsers} from './services/settingsService.js';
 
 /**
  * Отправляет расписание в конкретный чат
@@ -61,6 +61,47 @@ async function sendTimetableToChat(botToken, chatSettings, date = new Date()) {
 }
 
 /**
+ * Отправляет расписание конкретному пользователю в личные сообщения
+ * @param {string} botToken - Токен бота
+ * @param {Object} userSettings - Настройки пользователя
+ * @param {Date} date - Дата для получения расписания
+ * @returns {Promise<Object>} Результат отправки
+ */
+async function sendTimetableToUser(botToken, userSettings, date = new Date()) {
+  try {
+    const html = await fetchTimetable(userSettings.timetableUrl);
+    const timetableData = parseTimetable(html, date);
+    const message = formatTimetableMessage(timetableData);
+
+    await sendMessage(botToken, userSettings.userId, message);
+
+    return {
+      success: true,
+      userId: userSettings.userId,
+      data: timetableData,
+    };
+  } catch (error) {
+    console.error(
+      `Ошибка при отправке расписания пользователю ${userSettings.userId}:`,
+      error.message
+    );
+
+    try {
+      const errorMessage = formatErrorMessage();
+      await sendMessage(botToken, userSettings.userId, errorMessage);
+    } catch (sendError) {
+      console.error('Не удалось отправить сообщение об ошибке');
+    }
+
+    return {
+      success: false,
+      userId: userSettings.userId,
+      error: error.message,
+    };
+  }
+}
+
+/**
  * Обработка webhook от Telegram
  * @param {Request} request - HTTP запрос
  * @param {Object} env - Переменные окружения
@@ -101,17 +142,17 @@ async function handleWebhook(request, env) {
 }
 
 /**
- * Проверяет, должно ли расписание быть отправлено в данный момент для конкретного чата
- * @param {Object} chatSettings - Настройки чата
+ * Проверяет, должно ли расписание быть отправлено в данный момент для конкретного чата или пользователя
+ * @param {Object} settings - Настройки чата или пользователя
  * @param {Date} now - Текущее время
  * @returns {boolean} Должно ли быть отправлено расписание
  */
-function shouldSendTimetable(chatSettings, now) {
+function shouldSendTimetable(settings, now) {
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   
-  const sendHour = chatSettings.sendHour ?? 7;
-  const sendMinute = chatSettings.sendMinute ?? 0;
+  const sendHour = settings.sendHour ?? 7;
+  const sendMinute = settings.sendMinute ?? 0;
   
   // Проверяем, совпадает ли текущее время с настроенным временем отправки
   return currentHour === sendHour && currentMinute === sendMinute;
@@ -150,15 +191,16 @@ async function handleScheduledTimetable(request, env) {
       );
     }
 
-    // Получаем все активные чаты
+    // Получаем все активные чаты и пользователей
     const activeChats = await getAllActiveChats(env.SETTINGS_KV);
+    const activeUsers = await getAllActiveUsers(env.SETTINGS_KV);
 
-    if (activeChats.length === 0) {
+    if (activeChats.length === 0 && activeUsers.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
           skipped: true,
-          reason: 'Нет активных чатов',
+          reason: 'Нет активных чатов и пользователей',
         }),
         {
           status: 200,
@@ -167,19 +209,24 @@ async function handleScheduledTimetable(request, env) {
       );
     }
 
-    // Фильтруем чаты, для которых настало время отправки
+    // Фильтруем чаты и пользователей, для которых настало время отправки
     const chatsToSend = activeChats.filter((chatSettings) =>
       shouldSendTimetable(chatSettings, now)
     );
+    
+    const usersToSend = activeUsers.filter((userSettings) =>
+      shouldSendTimetable(userSettings, now)
+    );
 
-    if (chatsToSend.length === 0) {
+    if (chatsToSend.length === 0 && usersToSend.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
           skipped: true,
-          reason: 'Нет чатов для отправки в текущее время',
+          reason: 'Нет чатов и пользователей для отправки в текущее время',
           currentTime: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
           totalActiveChats: activeChats.length,
+          totalActiveUsers: activeUsers.length,
         }),
         {
           status: 200,
@@ -188,24 +235,32 @@ async function handleScheduledTimetable(request, env) {
       );
     }
 
-    // Отправляем расписание в чаты, для которых настало время
-    const results = await Promise.all(
+    // Отправляем расписание в чаты и пользователям, для которых настало время
+    const chatResults = await Promise.all(
       chatsToSend.map((chatSettings) =>
         sendTimetableToChat(env.BOT_TOKEN, chatSettings, now)
       )
     );
+    
+    const userResults = await Promise.all(
+      usersToSend.map((userSettings) =>
+        sendTimetableToUser(env.BOT_TOKEN, userSettings, now)
+      )
+    );
 
-    const successCount = results.filter((r) => r.success).length;
-    const failCount = results.filter((r) => !r.success).length;
+    const allResults = [...chatResults, ...userResults];
+    const successCount = allResults.filter((r) => r.success).length;
+    const failCount = allResults.filter((r) => !r.success).length;
 
     return new Response(
       JSON.stringify({
         success: true,
         totalChats: chatsToSend.length,
+        totalUsers: usersToSend.length,
         successCount,
         failCount,
         currentTime: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
-        results,
+        results: allResults,
       }),
       {
         status: 200,

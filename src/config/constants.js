@@ -15,6 +15,7 @@ export const CACHE_TTL = {
 // Префиксы для ключей в KV хранилище
 export const KV_KEYS = {
   CHAT_PREFIX: 'chat:',
+  USER_PREFIX: 'user:',
   FACULTIES_CACHE: 'faculties_cache',
   FACULTY_COURSES_PREFIX: 'faculty_courses:',
 };
@@ -52,6 +53,14 @@ export const DEFAULT_CHAT_SETTINGS = {
   adminIds: [],
   sendHour: 7, // Час отправки (0-23)
   sendMinute: 0, // Минута отправки (0 или 30)
+};
+
+// Настройки по умолчанию для личного чата пользователя
+export const DEFAULT_USER_SETTINGS = {
+  timetableUrl: 'https://timetable.tusur.ru/faculties/fsu/groups/425-m',
+  enabled: false, // По умолчанию выключено
+  sendHour: 7,
+  sendMinute: 0,
 };
 
 // Настройки дебаунса для предотвращения дублирования запросов
