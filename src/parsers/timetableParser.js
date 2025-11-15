@@ -258,53 +258,30 @@ export function parseTimetable(html, date = new Date()) {
 }
 
 /**
- * Извлекает текущий week_id из HTML страницы
- * @param {string} html - HTML код страницы
- * @returns {number|null} Текущий week_id или null
+ * Вычисляет week_id на основе даты
+ * Начало отсчета: 1 сентября 2025 года = week_id 786 (первый понедельник 1 сентября)
+ * @param {Date} date - Дата для вычисления
+ * @returns {number} week_id
  */
-function extractCurrentWeekId(html) {
-  // Ищем элемент с классом "current-week" или активную неделю
-  const patterns = [
-    // Ищем по классу current-week
-    /<li[^>]*class="[^"]*current-week[^"]*"[^>]*>\s*<a[^>]*href="[^"]*week_id=(\d+)[^"]*"/i,
-    /<li[^>]*class="[^"]*current[^"]*"[^>]*>\s*<a[^>]*href="[^"]*week_id=(\d+)[^"]*"/i,
-    /<a[^>]*class="[^"]*current[^"]*"[^>]*href="[^"]*week_id=(\d+)[^"]*"/i,
-    // Ищем по тексту "Текущая неделя"
-    /<li[^>]*>[^<]*Текущая неделя[^<]*<\/li>[^<]*<li[^>]*>[^<]*<a[^>]*href="[^"]*week_id=(\d+)[^"]*"/i,
-    // Ищем номер недели после текста "Текущая неделя"
-    /Текущая неделя[\s\S]{0,200}?week_id=(\d+)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match) {
-      return parseInt(match[1]);
-    }
-  }
-
-  // Если не нашли по паттернам, пробуем найти список недель и взять ту, что помечена как текущая
-  // Ищем все ссылки с week_id
-  const allWeeksRegex = /<li[^>]*>\s*(?:<a[^>]*href="[^"]*week_id=(\d+)[^"]*"[^>]*>)?[^<]*(\d+)\s+(чётная|нечётная|четная|нечетная)/gi;
-  let match;
-  const weeks = [];
+function calculateWeekIdFromDate(date) {
+  // Определяем учебный год
+  const year = date.getMonth() >= 8 ? date.getFullYear() : date.getFullYear() - 1;
   
-  while ((match = allWeeksRegex.exec(html)) !== null) {
-    weeks.push({
-      weekId: match[1] ? parseInt(match[1]) : null,
-      weekNumber: parseInt(match[2]),
-      text: match[0],
-    });
-  }
-
-  // Если нашли недели, берем первую с week_id (обычно это текущая неделя)
-  if (weeks.length > 0) {
-    const currentWeek = weeks.find(w => w.weekId !== null);
-    if (currentWeek) {
-      return currentWeek.weekId;
-    }
-  }
-
-  return null;
+  // Первый понедельник сентября (начало учебного года)
+  const startDate = new Date(year, 8, 1); // 1 сентября
+  const dayOfWeek = startDate.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7;
+  const firstMonday = new Date(year, 8, 1 + daysUntilMonday);
+  
+  // Вычисляем количество недель от первого понедельника
+  const diffDays = Math.floor((date - firstMonday) / (24 * 60 * 60 * 1000));
+  const weeksSinceStart = Math.floor(diffDays / 7);
+  
+  // Базовый week_id для 2025-2026 учебного года
+  // 1 сентября 2025 (понедельник) = week_id 786
+  const baseWeekId = 786;
+  
+  return baseWeekId + weeksSinceStart;
 }
 
 /**
@@ -336,44 +313,12 @@ export async function fetchTimetable(url, date = null) {
       return await response.text();
     }
 
-    // Загружаем текущую страницу, чтобы получить текущий week_id
+    // Вычисляем week_id для запрашиваемой даты
+    const targetWeekId = calculateWeekIdFromDate(date);
+
+    // Удаляем существующий week_id из URL, если он есть
     const baseUrl = url.replace(/[?&]week_id=\d+/, '');
-    const currentResponse = await fetch(baseUrl);
-    if (!currentResponse.ok) {
-      throw new Error(`HTTP error! status: ${currentResponse.status}`);
-    }
-    const currentHtml = await currentResponse.text();
-
-    // Извлекаем текущий week_id
-    let currentWeekId = extractCurrentWeekId(currentHtml);
     
-    // Если не удалось извлечь, пробуем из URL
-    if (!currentWeekId) {
-      const urlMatch = url.match(/week_id=(\d+)/);
-      if (urlMatch) {
-        currentWeekId = parseInt(urlMatch[1]);
-      }
-    }
-
-    // Если все еще не нашли week_id, возвращаем текущую страницу
-    if (!currentWeekId) {
-      return currentHtml;
-    }
-
-    // Вычисляем разницу в неделях между текущей датой и запрашиваемой
-    const now = new Date();
-    const currentWeekStart = getWeekStart(now);
-    const targetWeekStart = getWeekStart(date);
-    const weeksDiff = Math.round((targetWeekStart - currentWeekStart) / (7 * 24 * 60 * 60 * 1000));
-
-    // Если запрашиваем текущую неделю, возвращаем уже загруженный HTML
-    if (weeksDiff === 0) {
-      return currentHtml;
-    }
-
-    // Вычисляем целевой week_id
-    const targetWeekId = currentWeekId + weeksDiff;
-
     // Формируем URL с нужным week_id
     const separator = baseUrl.includes('?') ? '&' : '?';
     const finalUrl = `${baseUrl}${separator}week_id=${targetWeekId}`;
