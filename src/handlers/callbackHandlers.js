@@ -1118,8 +1118,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'get_day':
       // Получение расписания на выбранный день недели
       try {
-        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
-        const dayOfWeek = parseInt(parts[1] === 'user' ? parts[4] : parts[3]);
+        // Обрабатываем случай когда targetChatId = "user:userId" (5 частей) или обычный chatId (3 части)
+        // Формат: get_day:user:userId:day или get_day:chatId:day
+        const dayOfWeek = parseInt(parts[1] === 'user' ? parts[3] : parts[2]);
         
         const isUserSettingsGetDay = targetChatId && targetChatId.startsWith('user');
         const actualUserIdGetDay = isUserSettingsGetDay ? targetChatId.replace('user:', '') : null;
@@ -1154,8 +1155,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         const currentDay = now.getDay();
         let daysToAdd = dayOfWeek - currentDay;
         
-        // Если день уже прошел на этой неделе, берем следующую неделю
-        if (daysToAdd < 0) {
+        // Если день уже прошел на этой неделе или это сегодня, берем следующую неделю
+        if (daysToAdd <= 0) {
           daysToAdd += 7;
         }
         
