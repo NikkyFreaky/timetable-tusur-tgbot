@@ -15,12 +15,24 @@ export const CACHE_TTL = {
 // Префиксы для ключей в KV хранилище
 export const KV_KEYS = {
   CHAT_PREFIX: 'chat:',
+  USER_PREFIX: 'user:',
   FACULTIES_CACHE: 'faculties_cache',
   FACULTY_COURSES_PREFIX: 'faculty_courses:',
 };
 
 // Дни недели (сокращенные)
 export const DAYS_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+
+// Дни недели (полные названия)
+export const DAYS_FULL = [
+  'Воскресенье',
+  'Понедельник',
+  'Вторник',
+  'Среда',
+  'Четверг',
+  'Пятница',
+  'Суббота',
+];
 
 // Месяцы (сокращенные)
 export const MONTHS_SHORT = [
@@ -50,6 +62,16 @@ export const DEFAULT_CHAT_SETTINGS = {
   timetableUrl: 'https://timetable.tusur.ru/faculties/fsu/groups/425-m',
   enabled: true,
   adminIds: [],
+  sendHour: 7, // Час отправки (0-23)
+  sendMinute: 0, // Минута отправки (0 или 30)
+};
+
+// Настройки по умолчанию для личного чата пользователя
+export const DEFAULT_USER_SETTINGS = {
+  timetableUrl: 'https://timetable.tusur.ru/faculties/fsu/groups/425-m',
+  enabled: false, // По умолчанию выключено
+  sendHour: 7,
+  sendMinute: 0,
 };
 
 // Настройки дебаунса для предотвращения дублирования запросов
@@ -85,5 +107,10 @@ export const PARSE_MODE = 'HTML';
 export const KEYBOARD_LAYOUT = {
   COURSES_PER_ROW: 2,
   GROUPS_PER_ROW: 2,
+  HOURS_PER_ROW: 6,
+  MINUTES_PER_ROW: 2,
 };
+
+// Доступные минуты для выбора времени отправки
+export const AVAILABLE_MINUTES = [0, 30];
 

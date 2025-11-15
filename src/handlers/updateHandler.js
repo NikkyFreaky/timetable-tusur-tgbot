@@ -2,17 +2,22 @@
  * Главный обработчик обновлений от Telegram
  */
 
+import {MESSAGES} from '../config/messages.js';
+import {
+  getChatSettings,
+  saveChatSettings,
+} from '../services/settingsService.js';
+import {handleCallbackQuery} from './callbackHandlers.js';
 import {
   handleHelpCommand,
+  handleScheduleCommand,
   handleSetThreadCommand,
   handleSetUrlCommand,
   handleSettingsCommand,
   handleStartCommand,
   handleStatusCommand,
+  handleTodayCommand,
 } from './commandHandlers.js';
-import {handleCallbackQuery} from './callbackHandlers.js';
-import {getChatSettings, saveChatSettings} from '../services/settingsService.js';
-import {MESSAGES} from '../config/messages.js';
 
 /**
  * Обновляет кэш топиков форума при получении сообщения
@@ -66,16 +71,14 @@ async function updateForumTopicsCache(message, kv) {
     if (threadName && threadName !== settings.forumTopics[threadId]) {
       settings.forumTopics[threadId] = threadName;
       await saveChatSettings(kv, chatId, settings);
-      console.log(`Обновлено название темы ${threadId}: ${threadName}`);
     }
     // Если название не получили, но темы еще нет в кэше, добавляем с ID
     else if (!settings.forumTopics[threadId]) {
       settings.forumTopics[threadId] = `${MESSAGES.TOPIC_PREFIX} ${threadId}`;
       await saveChatSettings(kv, chatId, settings);
-      console.log(`Добавлена тема с ID: ${threadId}`);
     }
   } catch (error) {
-    console.error('Ошибка при обновлении кэша топиков:', error);
+    // Игнорируем ошибки при обновлении кэша топиков
   }
 }
 
@@ -103,6 +106,10 @@ export async function handleUpdate(update, botToken, kv) {
         await handleHelpCommand(message, botToken);
       } else if (text.startsWith('/status')) {
         await handleStatusCommand(message, botToken, kv);
+      } else if (text.startsWith('/today')) {
+        await handleTodayCommand(message, botToken, kv);
+      } else if (text.startsWith('/schedule')) {
+        await handleScheduleCommand(message, botToken, kv);
       } else if (text.startsWith('/seturl')) {
         const url = text.split(' ')[1];
         await handleSetUrlCommand(message, botToken, kv, url);
@@ -113,8 +120,6 @@ export async function handleUpdate(update, botToken, kv) {
       await handleCallbackQuery(update.callback_query, botToken, kv);
     }
   } catch (error) {
-    console.error('Ошибка при обработке команды:', error);
+    // Игнорируем ошибки обработки
   }
 }
-
-

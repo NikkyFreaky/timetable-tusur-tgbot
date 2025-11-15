@@ -89,13 +89,42 @@ export function parseTimetable(html, date = new Date()) {
     `${dayOfWeek},\\s*${dayOfMonth}\\s*${month}\\.`,
     `${dayOfWeek},\\s*${dayOfMonth}\\s*${month}`,
     `${dayOfWeek}[,\\s]+${dayOfMonth}[\\s]+${month}`,
+    // Добавляем более гибкие паттерны
+    `${dayOfWeek}.*?${dayOfMonth}.*?${month}`,
   ];
 
   let tableHtml = null;
   for (const table of allTables) {
-    if (datePatterns.some((p) => new RegExp(p, 'i').test(table))) {
-      tableHtml = table;
-      break;
+    // Проверяем каждый паттерн
+    for (const pattern of datePatterns) {
+      if (new RegExp(pattern, 'i').test(table)) {
+        tableHtml = table;
+        break;
+      }
+    }
+    if (tableHtml) break;
+  }
+
+  if (!tableHtml) {
+    // Если не нашли точное совпадение, пробуем найти по дню недели
+    // (полезно для расписания на текущую неделю)
+    const dayOfWeekFullPattern = new RegExp(
+      `<th[^>]*>\\s*${dayOfWeek}[^<]*</th>`,
+      'i'
+    );
+    
+    for (const table of allTables) {
+      if (dayOfWeekFullPattern.test(table)) {
+        // Дополнительно проверяем, что это нужная дата
+        const dateInTableRegex = new RegExp(
+          `${dayOfMonth}\\s*${month}`,
+          'i'
+        );
+        if (dateInTableRegex.test(table)) {
+          tableHtml = table;
+          break;
+        }
+      }
     }
   }
 
@@ -229,19 +258,78 @@ export function parseTimetable(html, date = new Date()) {
 }
 
 /**
+ * Вычисляет week_id на основе даты
+ * Начало отсчета: 1 сентября 2025 года = week_id 786 (первый понедельник 1 сентября)
+ * @param {Date} date - Дата для вычисления
+ * @returns {number} week_id
+ */
+function calculateWeekIdFromDate(date) {
+  // Определяем учебный год
+  const year = date.getMonth() >= 8 ? date.getFullYear() : date.getFullYear() - 1;
+  
+  // Первый понедельник сентября (начало учебного года)
+  const startDate = new Date(year, 8, 1); // 1 сентября
+  const dayOfWeek = startDate.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7;
+  const firstMonday = new Date(year, 8, 1 + daysUntilMonday);
+  
+  // Вычисляем количество недель от первого понедельника
+  const diffDays = Math.floor((date - firstMonday) / (24 * 60 * 60 * 1000));
+  const weeksSinceStart = Math.floor(diffDays / 7);
+  
+  // Базовый week_id для 2025-2026 учебного года
+  // 1 сентября 2025 (понедельник) = week_id 786
+  const baseWeekId = 786;
+  
+  return baseWeekId + weeksSinceStart;
+}
+
+/**
+ * Вычисляет начало недели (понедельник) для заданной даты
+ * @param {Date} date - Дата
+ * @returns {Date} Дата понедельника этой недели
+ */
+function getWeekStart(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Корректируем на понедельник
+  return new Date(d.setDate(diff));
+}
+
+/**
  * Получает HTML страницы расписания
  * @param {string} url - URL страницы расписания
+ * @param {Date} date - Дата для получения расписания (опционально)
  * @returns {Promise<string>} HTML код страницы
  */
-export async function fetchTimetable(url) {
+export async function fetchTimetable(url, date = null) {
   try {
-    const response = await fetch(url);
+    // Если дата не указана, просто загружаем страницу
+    if (!date) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.text();
+    }
+
+    // Вычисляем week_id для запрашиваемой даты
+    const targetWeekId = calculateWeekIdFromDate(date);
+
+    // Удаляем существующий week_id из URL, если он есть
+    const baseUrl = url.replace(/[?&]week_id=\d+/, '');
+    
+    // Формируем URL с нужным week_id
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const finalUrl = `${baseUrl}${separator}week_id=${targetWeekId}`;
+
+    // Загружаем страницу с нужной неделей
+    const response = await fetch(finalUrl);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     return await response.text();
   } catch (error) {
-    console.error('Ошибка при получении расписания:', error);
     throw error;
   }
 }

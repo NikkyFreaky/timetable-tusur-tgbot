@@ -2,17 +2,30 @@
  * Обработчики основных команд бота
  */
 
-import {CHAT_TYPES} from '../config/constants.js';
+import {CHAT_TYPES, DAYS_FULL} from '../config/constants.js';
 import {MESSAGES} from '../config/messages.js';
 import {
   getChatSettings,
   getUserChats,
+  getUserSettings,
   initializeChatSettings,
+  initializeUserSettings,
   saveChatSettings,
   updateChatSetting,
 } from '../services/settingsService.js';
 import {checkTelegramAdmin, getChatInfo, sendMessage} from '../utils/telegramApi.js';
-import {createChatsListKeyboard, createSettingsKeyboard} from '../utils/keyboards.js';
+import {
+  createChatsListKeyboard,
+  createDaySelectionKeyboard,
+  createFacultySelectionKeyboard,
+  createGroupChatKeyboard,
+  createMainMenuKeyboard,
+  createSettingsKeyboard,
+  createUserSettingsKeyboard,
+} from '../utils/keyboards.js';
+import {fetchTimetable, parseTimetable} from '../parsers/timetableParser.js';
+import {formatTimetableMessage} from '../utils/formatter.js';
+import {getFacultiesWithCache} from '../services/cacheService.js';
 
 /**
  * Обрабатывает команду /start
@@ -27,55 +40,57 @@ export async function handleStartCommand(message, botToken, kv) {
   const isPrivate = message.chat.type === CHAT_TYPES.PRIVATE;
 
   if (isPrivate) {
-    // В личных сообщениях показываем список чатов
-    const userChats = await getUserChats(kv, userId.toString());
+    // Инициализируем настройки пользователя, если их еще нет
+    await initializeUserSettings(kv, userId.toString());
 
-    let text = MESSAGES.WELCOME_PRIVATE;
+    // В личных сообщениях показываем главное меню
+    const text = MESSAGES.WELCOME_PRIVATE + MESSAGES.WELCOME_PERSONAL;
 
-    if (userChats.length === 0) {
-      text += MESSAGES.WELCOME_NO_CHATS;
-
-      await sendMessage(botToken, chatId, text);
-    } else {
-      text += MESSAGES.WELCOME_SELECT_CHAT;
-
-      await sendMessage(botToken, chatId, text, {
-        reply_markup: createChatsListKeyboard(userChats),
-      });
-    }
+    await sendMessage(botToken, chatId, text, {
+      reply_markup: createMainMenuKeyboard(userId.toString()),
+    });
   } else {
-    // В групповом чате инициализируем настройки
-    const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
+    // В групповом чате показываем меню с расписанием
+    // Проверяем, инициализирован ли чат
+    let settings = await getChatSettings(kv, chatId.toString());
+    
+    if (!settings) {
+      // Если настройки не найдены, инициализируем их (только для админов)
+      const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
 
-    if (!isAdmin) {
-      await sendMessage(botToken, chatId, MESSAGES.ERROR_ADMIN_ONLY, {
-        message_thread_id: message.message_thread_id,
-      });
-      return;
-    }
-
-    // Получаем информацию о чате
-    const chatInfo = await getChatInfo(botToken, chatId);
-    const chatName = chatInfo?.title || `${MESSAGES.CHAT_PREFIX} ${chatId}`;
-
-    const settings = await initializeChatSettings(
-      kv,
-      chatId.toString(),
-      userId.toString(),
-      {
-        chatName: chatName,
+      if (!isAdmin) {
+        await sendMessage(botToken, chatId, MESSAGES.ERROR_ADMIN_ONLY, {
+          message_thread_id: message.message_thread_id,
+        });
+        return;
       }
-    );
 
-    if (settings) {
-      await sendMessage(botToken, chatId, MESSAGES.BOT_CONFIGURED, {
-        message_thread_id: message.message_thread_id,
-      });
-    } else {
-      await sendMessage(botToken, chatId, MESSAGES.ERROR_BOT_SETUP, {
-        message_thread_id: message.message_thread_id,
-      });
+      // Получаем информацию о чате
+      const chatInfo = await getChatInfo(botToken, chatId);
+      const chatName = chatInfo?.title || `${MESSAGES.CHAT_PREFIX} ${chatId}`;
+
+      settings = await initializeChatSettings(
+        kv,
+        chatId.toString(),
+        userId.toString(),
+        {
+          chatName: chatName,
+        }
+      );
+
+      if (!settings) {
+        await sendMessage(botToken, chatId, MESSAGES.ERROR_BOT_SETUP, {
+          message_thread_id: message.message_thread_id,
+        });
+        return;
+      }
     }
+
+    // Показываем меню с кнопками расписания (доступно всем пользователям)
+    await sendMessage(botToken, chatId, MESSAGES.GROUP_CHAT_MENU, {
+      reply_markup: createGroupChatKeyboard(chatId.toString()),
+      message_thread_id: message.message_thread_id,
+    });
   }
 }
 
@@ -92,16 +107,11 @@ export async function handleSettingsCommand(message, botToken, kv) {
   const isPrivate = message.chat.type === CHAT_TYPES.PRIVATE;
 
   if (isPrivate) {
-    // В личных сообщениях показываем список чатов
-    const userChats = await getUserChats(kv, userId.toString());
+    // В личных сообщениях показываем главное меню
+    const text = MESSAGES.WELCOME_PRIVATE + MESSAGES.WELCOME_PERSONAL;
 
-    if (userChats.length === 0) {
-      await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_CHATS);
-      return;
-    }
-
-    await sendMessage(botToken, chatId, MESSAGES.SETTINGS_SELECT_CHAT, {
-      reply_markup: createChatsListKeyboard(userChats),
+    await sendMessage(botToken, chatId, text, {
+      reply_markup: createMainMenuKeyboard(userId.toString()),
     });
   } else {
     // В групповом чате показываем настройки
@@ -379,5 +389,121 @@ export async function handleSetThreadCommand(message, botToken, kv) {
       message_thread_id: threadId,
     });
   }
+}
+
+/**
+ * Вспомогательная функция для получения расписания
+ * @param {Object} message - Объект сообщения от Telegram
+ * @param {string} botToken - Токен бота
+ * @param {KVNamespace} kv - KV namespace
+ * @param {Date} date - Дата для получения расписания
+ * @returns {Promise<void>}
+ */
+async function getTimetableForDate(message, botToken, kv, date) {
+  const chatId = message.chat.id;
+  const userId = message.from.id;
+  const isPrivate = message.chat.type === CHAT_TYPES.PRIVATE;
+
+  // Получаем настройки
+  const settings = isPrivate
+    ? await getUserSettings(kv, userId.toString())
+    : await getChatSettings(kv, chatId.toString());
+
+  if (!settings) {
+    await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_SETTINGS);
+    return;
+  }
+
+  // Проверяем, выбрана ли группа
+  if (!settings.timetableUrl || !settings.groupSlug) {
+    // Показываем сообщение об ошибке и предлагаем выбрать группу
+    const faculties = await getFacultiesWithCache(kv);
+    
+    if (!faculties || faculties.length === 0) {
+      await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_GROUP_SELECTED);
+      return;
+    }
+
+    const targetId = isPrivate ? `user:${userId}` : chatId.toString();
+    
+    await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_GROUP_SELECTED, {
+      reply_markup: createFacultySelectionKeyboard(targetId, faculties),
+    });
+    return;
+  }
+
+  try {
+    // Получаем и парсим расписание
+    const html = await fetchTimetable(settings.timetableUrl, date);
+    const timetableData = parseTimetable(html, date);
+    const message = formatTimetableMessage(timetableData);
+
+    // Отправляем расписание
+    await sendMessage(botToken, chatId, message, {
+      message_thread_id: settings.threadId || undefined,
+    });
+  } catch (error) {
+    await sendMessage(botToken, chatId, MESSAGES.ERROR_TIMETABLE);
+  }
+}
+
+/**
+ * Обрабатывает команду /today - показывает расписание на сегодня
+ * @param {Object} message - Объект сообщения от Telegram
+ * @param {string} botToken - Токен бота
+ * @param {KVNamespace} kv - KV namespace
+ * @returns {Promise<void>}
+ */
+export async function handleTodayCommand(message, botToken, kv) {
+  const today = new Date();
+  await getTimetableForDate(message, botToken, kv, today);
+}
+
+/**
+ * Обрабатывает команду /schedule - показывает меню выбора дня недели
+ * @param {Object} message - Объект сообщения от Telegram
+ * @param {string} botToken - Токен бота
+ * @param {KVNamespace} kv - KV namespace
+ * @returns {Promise<void>}
+ */
+export async function handleScheduleCommand(message, botToken, kv) {
+  const chatId = message.chat.id;
+  const userId = message.from.id;
+  const isPrivate = message.chat.type === CHAT_TYPES.PRIVATE;
+
+  // Получаем настройки
+  const settings = isPrivate
+    ? await getUserSettings(kv, userId.toString())
+    : await getChatSettings(kv, chatId.toString());
+
+  if (!settings) {
+    await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_SETTINGS);
+    return;
+  }
+
+  // Проверяем, выбрана ли группа
+  if (!settings.timetableUrl || !settings.groupSlug) {
+    // Показываем сообщение об ошибке и предлагаем выбрать группу
+    const faculties = await getFacultiesWithCache(kv);
+    
+    if (!faculties || faculties.length === 0) {
+      await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_GROUP_SELECTED);
+      return;
+    }
+
+    const targetId = isPrivate ? `user:${userId}` : chatId.toString();
+    
+    await sendMessage(botToken, chatId, MESSAGES.ERROR_NO_GROUP_SELECTED, {
+      reply_markup: createFacultySelectionKeyboard(targetId, faculties),
+    });
+    return;
+  }
+
+  // Показываем меню выбора дня недели
+  const targetId = isPrivate ? `user:${userId}` : chatId.toString();
+  
+  await sendMessage(botToken, chatId, MESSAGES.TIMETABLE_SELECT_DAY, {
+    reply_markup: createDaySelectionKeyboard(targetId),
+  });
 }
 

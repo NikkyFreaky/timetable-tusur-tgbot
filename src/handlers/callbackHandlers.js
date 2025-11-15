@@ -2,17 +2,22 @@
  * Обработчик callback query от inline кнопок
  */
 
-import {BASE_URL} from '../config/constants.js';
+import {BASE_URL, DAYS_FULL} from '../config/constants.js';
 import {MESSAGES} from '../config/messages.js';
 import {
   getFacultiesWithCache,
   getFacultyCoursesWithCache,
 } from '../services/cacheService.js';
+import {fetchTimetable, parseTimetable} from '../parsers/timetableParser.js';
+import {formatTimetableMessage} from '../utils/formatter.js';
 import {
   getChatSettings,
   getUserChats,
+  getUserSettings,
+  initializeUserSettings,
   isUserAdmin,
   saveChatSettings,
+  saveUserSettings,
 } from '../services/settingsService.js';
 import {
   answerCallbackQuery,
@@ -22,10 +27,15 @@ import {
 import {
   createChatsListKeyboard,
   createCourseSelectionKeyboard,
+  createDaySelectionKeyboard,
   createFacultySelectionKeyboard,
   createGroupSelectionKeyboard,
+  createMainMenuKeyboard,
   createSettingsKeyboard,
   createThreadSelectionKeyboard,
+  createUserSettingsKeyboard,
+  createHourSelectionKeyboard,
+  createMinuteSelectionKeyboard,
 } from '../utils/keyboards.js';
 
 /**
@@ -44,6 +54,10 @@ function formatSettingsText(settings) {
     ? settings.groupSlug.toUpperCase()
     : MESSAGES.SETTINGS_NOT_SELECTED;
 
+  const sendHour = settings.sendHour ?? 7;
+  const sendMinute = settings.sendMinute ?? 0;
+  const timeDisplay = `${sendHour.toString().padStart(2, '0')}:${sendMinute.toString().padStart(2, '0')}`;
+
   return (
     MESSAGES.SETTINGS_HEADER +
     `${MESSAGES.SETTINGS_CHAT_NAME} ${
@@ -53,7 +67,33 @@ function formatSettingsText(settings) {
       settings.enabled ? MESSAGES.STATUS_ENABLED : MESSAGES.STATUS_DISABLED
     }\n` +
     `${MESSAGES.SETTINGS_GROUP} ${groupDisplay}\n` +
-    `${MESSAGES.SETTINGS_THREAD} ${threadDisplay}\n\n` +
+    `${MESSAGES.SETTINGS_THREAD} ${threadDisplay}\n` +
+    `${MESSAGES.SETTINGS_SEND_TIME} ${timeDisplay}\n\n` +
+    MESSAGES.SETTINGS_SELECT_PARAMETER
+  );
+}
+
+/**
+ * Форматирует текст настроек пользователя
+ * @param {Object} settings - Настройки пользователя
+ * @returns {string} Отформатированный текст
+ */
+function formatUserSettingsText(settings) {
+  const groupDisplay = settings.groupSlug
+    ? settings.groupSlug.toUpperCase()
+    : MESSAGES.SETTINGS_NOT_SELECTED;
+
+  const sendHour = settings.sendHour ?? 7;
+  const sendMinute = settings.sendMinute ?? 0;
+  const timeDisplay = `${sendHour.toString().padStart(2, '0')}:${sendMinute.toString().padStart(2, '0')}`;
+
+  return (
+    MESSAGES.SETTINGS_HEADER_PERSONAL +
+    `${MESSAGES.SETTINGS_STATUS} ${
+      settings.enabled ? MESSAGES.STATUS_ENABLED : MESSAGES.STATUS_DISABLED
+    }\n` +
+    `${MESSAGES.SETTINGS_GROUP} ${groupDisplay}\n` +
+    `${MESSAGES.SETTINGS_SEND_TIME} ${timeDisplay}\n\n` +
     MESSAGES.SETTINGS_SELECT_PARAMETER
   );
 }
@@ -71,35 +111,113 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
   const message = callbackQuery.message;
   const chatId = message.chat.id;
   const messageId = message.message_id;
+  const isPrivateChat = message.chat.type === 'private';
 
   const parts = data.split(':');
   const action = parts[0];
-  const targetChatId = parts[1];
+  // Если targetChatId имеет формат "user:userId", объединяем части обратно
+  const targetChatId = parts[1] === 'user' ? `${parts[1]}:${parts[2]}` : parts[1];
 
-  // Проверяем права администратора
-  const isAdmin = await checkTelegramAdmin(botToken, targetChatId, userId);
-  const isAdminInKV = await isUserAdmin(kv, targetChatId, userId.toString());
+  // Действия, которые не требуют предварительной проверки прав и настроек
+  // (они сами определяют, работают ли с личными настройками или групповыми)
+  const actionsWithoutSettingsCheck = [
+    'my_settings',
+    'group_chats',
+    'back_to_main',
+    'back_to_chats',
+    'back_to_settings',
+    'select_chat',
+    'toggle_user_enabled',
+    'change_user_group',
+    'change_user_time',
+    'select_faculty',
+    'select_course',
+    'select_group',
+    'select_hour',
+    'select_minute',
+    'back_to_faculties',
+    'back_to_courses',
+    'change_time',
+    'change_group',
+    'get_today',
+    'select_day',
+    'get_day',
+  ];
 
-  if (!isAdmin && !isAdminInKV) {
-    await answerCallbackQuery(
-      botToken,
-      callbackQuery.id,
-      MESSAGES.ERROR_NO_RIGHTS,
-      true
-    );
-    return;
+  // Если это действие без проверки настроек, обрабатываем его отдельно
+  if (actionsWithoutSettingsCheck.includes(action)) {
+    // Эти действия обрабатываются в switch ниже без предварительных проверок
+  } else {
+    // Определяем, работаем ли мы с личными настройками пользователя
+    const isUserSettings = targetChatId && targetChatId.startsWith('user');
+    const actualUserId = isUserSettings ? targetChatId.replace('user:', '') : null;
+
+    // Для личных настроек не проверяем права администратора
+    if (!isUserSettings) {
+      // Проверяем права администратора для групповых чатов
+      const isAdmin = await checkTelegramAdmin(botToken, targetChatId, userId);
+      const isAdminInKV = await isUserAdmin(kv, targetChatId, userId.toString());
+
+      if (!isAdmin && !isAdminInKV) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_NO_RIGHTS,
+          true
+        );
+        return;
+      }
+
+      const settings = await getChatSettings(kv, targetChatId);
+
+      if (!settings) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+          true
+        );
+        return;
+      }
+    } else {
+      // Проверяем, что пользователь работает со своими настройками
+      if (actualUserId !== userId.toString()) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_NO_RIGHTS,
+          true
+        );
+        return;
+      }
+    }
+
+    // Получаем настройки (чата или пользователя)
+    const settings = isUserSettings
+      ? await getUserSettings(kv, actualUserId)
+      : await getChatSettings(kv, targetChatId);
+
+    if (!settings) {
+      await answerCallbackQuery(
+        botToken,
+        callbackQuery.id,
+        MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+        true
+      );
+      return;
+    }
   }
 
-  const settings = await getChatSettings(kv, targetChatId);
-
-  if (!settings) {
-    await answerCallbackQuery(
-      botToken,
-      callbackQuery.id,
-      MESSAGES.ERROR_SETTINGS_NOT_FOUND,
-      true
-    );
-    return;
+  // Определяем параметры для использования в switch
+  const isUserSettings = targetChatId && targetChatId.startsWith('user');
+  const actualUserId = isUserSettings ? targetChatId.replace('user:', '') : null;
+  
+  // Получаем настройки для использования в switch (если они нужны)
+  let settings = null;
+  if (!actionsWithoutSettingsCheck.includes(action)) {
+    settings = isUserSettings
+      ? await getUserSettings(kv, actualUserId)
+      : await getChatSettings(kv, targetChatId);
   }
 
   switch (action) {
@@ -108,7 +226,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await saveChatSettings(kv, targetChatId, settings);
 
       await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings),
+        reply_markup: createSettingsKeyboard(targetChatId, settings, isPrivateChat),
       });
 
       await answerCallbackQuery(
@@ -130,6 +248,17 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       // Показываем список факультетов
       try {
         const faculties = await getFacultiesWithCache(kv);
+        
+        if (!faculties || faculties.length === 0) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_LOADING_FACULTIES,
+            true
+          );
+          break;
+        }
+
         const facultiesText = MESSAGES.GROUP_SELECTION_STEP1;
 
         await editMessage(botToken, chatId, messageId, facultiesText, {
@@ -138,7 +267,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка факультетов:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -163,12 +291,33 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       break;
 
     case 'select_chat':
-      // Показываем настройки с кнопкой "Назад" (так как это личные сообщения)
-      await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings, true),
-      });
+      // Показываем настройки выбранного чата с кнопкой "Назад" (так как это личные сообщения)
+      try {
+        const chatSettings = await getChatSettings(kv, targetChatId);
+        
+        if (!chatSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
 
-      await answerCallbackQuery(botToken, callbackQuery.id);
+        await editMessage(botToken, chatId, messageId, formatSettingsText(chatSettings), {
+          reply_markup: createSettingsKeyboard(targetChatId, chatSettings, true),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
       break;
 
     case 'select_thread':
@@ -183,7 +332,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await saveChatSettings(kv, targetChatId, settings);
 
       await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings),
+        reply_markup: createSettingsKeyboard(targetChatId, settings, isPrivateChat),
       });
 
       await answerCallbackQuery(
@@ -195,11 +344,46 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
     case 'back_to_settings':
       // Возврат к настройкам (с кнопкой "Назад" если это личные сообщения)
-      await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
-        reply_markup: createSettingsKeyboard(targetChatId, settings, true),
-      });
+      try {
+        // Определяем тип настроек
+        const isUserSettingsBack = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdBack = isUserSettingsBack ? targetChatId.replace('user:', '') : null;
+        
+        const settingsBack = isUserSettingsBack
+          ? await getUserSettings(kv, actualUserIdBack)
+          : await getChatSettings(kv, targetChatId);
 
-      await answerCallbackQuery(botToken, callbackQuery.id);
+        if (!settingsBack) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        const textBack = isUserSettingsBack
+          ? formatUserSettingsText(settingsBack)
+          : formatSettingsText(settingsBack);
+        
+        const keyboardBack = isUserSettingsBack
+          ? createUserSettingsKeyboard(actualUserIdBack, settingsBack)
+          : createSettingsKeyboard(targetChatId, settingsBack, true);
+
+        await editMessage(botToken, chatId, messageId, textBack, {
+          reply_markup: keyboardBack,
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
       break;
 
     case 'back_to_chats':
@@ -223,7 +407,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате к списку чатов:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -245,7 +428,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_faculty':
       // Выбор факультета - показываем курсы
       try {
-        const facultySlug = parts[2];
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const facultySlug = parts[1] === 'user' ? parts[3] : parts[2];
         const courses = await getFacultyCoursesWithCache(kv, facultySlug);
 
         if (!courses || Object.keys(courses).length === 0) {
@@ -270,7 +454,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка курсов:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -283,8 +466,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_course':
       // Выбор курса - показываем группы
       try {
-        const courseFacultySlug = parts[2];
-        const courseNumber = parts[3];
+        // Обрабатываем случай когда targetChatId = "user:userId" (5 частей) или обычный chatId (4 части)
+        const courseFacultySlug = parts[1] === 'user' ? parts[3] : parts[2];
+        const courseNumber = parts[1] === 'user' ? parts[4] : parts[3];
         const coursesData = await getFacultyCoursesWithCache(
           kv,
           courseFacultySlug
@@ -325,7 +509,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка групп:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -338,36 +521,68 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_group':
       // Выбор группы - сохраняем в настройки
       try {
-        const groupFacultySlug = parts[2];
-        const groupSlug = parts[3];
+        // Обрабатываем случай когда targetChatId = "user:userId" (5 частей) или обычный chatId (4 части)
+        const groupFacultySlug = parts[1] === 'user' ? parts[3] : parts[2];
+        const groupSlug = parts[1] === 'user' ? parts[4] : parts[3];
         const groupUrl = `${BASE_URL}/faculties/${groupFacultySlug}/groups/${groupSlug}`;
 
-        settings.timetableUrl = groupUrl;
-        settings.groupSlug = groupSlug;
-        settings.facultySlug = groupFacultySlug;
-        await saveChatSettings(kv, targetChatId, settings);
+        // Загружаем настройки
+        const groupSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
 
-        const groupThreadDisplay = settings.threadName
-          ? settings.threadName
-          : settings.threadId
-          ? `ID: ${settings.threadId}`
-          : MESSAGES.SETTINGS_NOT_SET;
+        if (!groupSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
 
-        const groupSuccessText =
-          MESSAGES.SETTINGS_HEADER +
-          `${MESSAGES.SETTINGS_CHAT_NAME} ${
-            settings.chatName || `ID: ${settings.chatId}`
-          }\n` +
-          `${MESSAGES.SETTINGS_STATUS} ${
-            settings.enabled ? MESSAGES.STATUS_ENABLED : MESSAGES.STATUS_DISABLED
-          }\n` +
-          `${MESSAGES.SETTINGS_GROUP} ${groupSlug.toUpperCase()}\n` +
-          `${MESSAGES.SETTINGS_URL} ${settings.timetableUrl}\n` +
-          `${MESSAGES.SETTINGS_THREAD} ${groupThreadDisplay}\n\n` +
-          MESSAGES.SETTINGS_SELECT_PARAMETER;
+        groupSettings.timetableUrl = groupUrl;
+        groupSettings.groupSlug = groupSlug;
+        groupSettings.facultySlug = groupFacultySlug;
+        
+        if (isUserSettings) {
+          await saveUserSettings(kv, actualUserId, groupSettings);
+        } else {
+          await saveChatSettings(kv, targetChatId, groupSettings);
+        }
+
+        // Формируем текст и клавиатуру в зависимости от типа настроек
+        let groupSuccessText;
+        let keyboard;
+        
+        if (isUserSettings) {
+          groupSuccessText = formatUserSettingsText(groupSettings);
+          keyboard = createUserSettingsKeyboard(actualUserId, groupSettings);
+        } else {
+          const groupThreadDisplay = groupSettings.threadName
+            ? groupSettings.threadName
+            : groupSettings.threadId
+            ? `ID: ${groupSettings.threadId}`
+            : MESSAGES.SETTINGS_NOT_SET;
+
+          groupSuccessText =
+            MESSAGES.SETTINGS_HEADER +
+            `${MESSAGES.SETTINGS_CHAT_NAME} ${
+              groupSettings.chatName || `ID: ${groupSettings.chatId}`
+            }\n` +
+            `${MESSAGES.SETTINGS_STATUS} ${
+              groupSettings.enabled ? MESSAGES.STATUS_ENABLED : MESSAGES.STATUS_DISABLED
+            }\n` +
+            `${MESSAGES.SETTINGS_GROUP} ${groupSlug.toUpperCase()}\n` +
+            `${MESSAGES.SETTINGS_URL} ${groupSettings.timetableUrl}\n` +
+            `${MESSAGES.SETTINGS_THREAD} ${groupThreadDisplay}\n\n` +
+            MESSAGES.SETTINGS_SELECT_PARAMETER;
+
+          keyboard = createSettingsKeyboard(targetChatId, groupSettings, isPrivateChat);
+        }
 
         await editMessage(botToken, chatId, messageId, groupSuccessText, {
-          reply_markup: createSettingsKeyboard(targetChatId, settings),
+          reply_markup: keyboard,
         });
 
         await answerCallbackQuery(
@@ -376,7 +591,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
           `${MESSAGES.GROUP_SELECTED} ${groupSlug.toUpperCase()} ${MESSAGES.GROUP_SELECTED_SUFFIX}`
         );
       } catch (error) {
-        console.error('Ошибка при сохранении группы:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -401,7 +615,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате к факультетам:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -414,7 +627,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'back_to_courses':
       // Возврат к списку курсов
       try {
-        const backFacultySlug = parts[2];
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const backFacultySlug = parts[1] === 'user' ? parts[3] : parts[2];
         const backCourses = await getFacultyCoursesWithCache(
           kv,
           backFacultySlug
@@ -432,11 +646,535 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате к курсам:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
           MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'change_time':
+      // Показываем выбор часа
+      try {
+        // Загружаем настройки
+        const timeSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!timeSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        const currentHour = timeSettings.sendHour ?? 7;
+        const currentMinute = timeSettings.sendMinute ?? 0;
+        const timeText =
+          MESSAGES.TIME_SELECTION_HEADER +
+          `${MESSAGES.TIME_CURRENT} ${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}\n\n` +
+          MESSAGES.TIME_SELECTION_HOUR;
+
+        await editMessage(botToken, chatId, messageId, timeText, {
+          reply_markup: createHourSelectionKeyboard(targetChatId, currentHour),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'select_hour':
+      // Выбор часа - показываем выбор минут
+      try {
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const selectedHour = parseInt(parts[1] === 'user' ? parts[3] : parts[2]);
+        
+        // Загружаем настройки
+        const hourSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!hourSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        hourSettings.sendHour = selectedHour;
+        
+        if (isUserSettings) {
+          await saveUserSettings(kv, actualUserId, hourSettings);
+        } else {
+          await saveChatSettings(kv, targetChatId, hourSettings);
+        }
+
+        const currentMinute = hourSettings.sendMinute ?? 0;
+        const minuteText =
+          MESSAGES.TIME_SELECTION_HEADER +
+          `${MESSAGES.TIME_CURRENT} ${selectedHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}\n\n` +
+          MESSAGES.TIME_SELECTION_MINUTE;
+
+        await editMessage(botToken, chatId, messageId, minuteText, {
+          reply_markup: createMinuteSelectionKeyboard(targetChatId, currentMinute),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'select_minute':
+      // Выбор минуты - сохраняем и возвращаемся к настройкам
+      try {
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const selectedMinute = parseInt(parts[1] === 'user' ? parts[3] : parts[2]);
+        
+        // Загружаем настройки
+        const minuteSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!minuteSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        minuteSettings.sendMinute = selectedMinute;
+        
+        if (isUserSettings) {
+          await saveUserSettings(kv, actualUserId, minuteSettings);
+          
+          await editMessage(botToken, chatId, messageId, formatUserSettingsText(minuteSettings), {
+            reply_markup: createUserSettingsKeyboard(actualUserId, minuteSettings),
+          });
+        } else {
+          await saveChatSettings(kv, targetChatId, minuteSettings);
+          
+          await editMessage(botToken, chatId, messageId, formatSettingsText(minuteSettings), {
+            reply_markup: createSettingsKeyboard(targetChatId, minuteSettings, isPrivateChat),
+          });
+        }
+
+        const timeStr = `${minuteSettings.sendHour.toString().padStart(2, '0')}:${minuteSettings.sendMinute.toString().padStart(2, '0')}`;
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          `${MESSAGES.TIME_SET_SUCCESS} ${timeStr}`
+        );
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'my_settings':
+      // Показываем личные настройки пользователя
+      try {
+        let userSettings = await getUserSettings(kv, userId.toString());
+        
+        // Если настройки не найдены, инициализируем их
+        if (!userSettings) {
+          userSettings = await initializeUserSettings(kv, userId.toString());
+          
+          if (!userSettings) {
+            await answerCallbackQuery(
+              botToken,
+              callbackQuery.id,
+              MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+              true
+            );
+            break;
+          }
+        }
+
+        await editMessage(botToken, chatId, messageId, formatUserSettingsText(userSettings), {
+          reply_markup: createUserSettingsKeyboard(userId.toString(), userSettings),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'group_chats':
+      // Показываем список групповых чатов
+      try {
+        const userChats = await getUserChats(kv, userId.toString());
+
+        if (userChats.length === 0) {
+          await editMessage(
+            botToken,
+            chatId,
+            messageId,
+            MESSAGES.WELCOME_PRIVATE + MESSAGES.WELCOME_NO_CHATS,
+            {
+              reply_markup: createMainMenuKeyboard(userId.toString()),
+            }
+          );
+        } else {
+          await editMessage(
+            botToken,
+            chatId,
+            messageId,
+            MESSAGES.SETTINGS_SELECT_CHAT,
+            {
+              reply_markup: createChatsListKeyboard(userChats),
+            }
+          );
+        }
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'back_to_main':
+      // Возврат в главное меню
+      try {
+        const mainMenuText = MESSAGES.WELCOME_PRIVATE + MESSAGES.WELCOME_PERSONAL;
+        
+        await editMessage(botToken, chatId, messageId, mainMenuText, {
+          reply_markup: createMainMenuKeyboard(userId.toString()),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'toggle_user_enabled':
+      // Переключение статуса для личных настроек
+      try {
+        const userSettings = await getUserSettings(kv, userId.toString());
+        
+        if (!userSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        userSettings.enabled = !userSettings.enabled;
+        await saveUserSettings(kv, userId.toString(), userSettings);
+
+        await editMessage(botToken, chatId, messageId, formatUserSettingsText(userSettings), {
+          reply_markup: createUserSettingsKeyboard(userId.toString(), userSettings),
+        });
+
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          userSettings.enabled ? MESSAGES.STATUS_BOT_ENABLED : MESSAGES.STATUS_BOT_DISABLED
+        );
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'change_user_group':
+      // Изменение группы для личных настроек
+      try {
+        const faculties = await getFacultiesWithCache(kv);
+        
+        if (!faculties || faculties.length === 0) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_LOADING_FACULTIES,
+            true
+          );
+          break;
+        }
+
+        const facultiesText = MESSAGES.GROUP_SELECTION_STEP1;
+
+        await editMessage(botToken, chatId, messageId, facultiesText, {
+          reply_markup: createFacultySelectionKeyboard(`user:${userId}`, faculties),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING_FACULTIES,
+          true
+        );
+      }
+      break;
+
+    case 'change_user_time':
+      // Изменение времени для личных настроек
+      try {
+        const userSettings = await getUserSettings(kv, userId.toString());
+        
+        if (!userSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        const currentHour = userSettings.sendHour ?? 7;
+        const currentMinute = userSettings.sendMinute ?? 0;
+        const timeText =
+          MESSAGES.TIME_SELECTION_HEADER +
+          `${MESSAGES.TIME_CURRENT} ${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}\n\n` +
+          MESSAGES.TIME_SELECTION_HOUR;
+
+        await editMessage(botToken, chatId, messageId, timeText, {
+          reply_markup: createHourSelectionKeyboard(`user:${userId}`, currentHour),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'get_today':
+      // Получение расписания на сегодня
+      try {
+        const isUserSettingsToday = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdToday = isUserSettingsToday ? targetChatId.replace('user:', '') : null;
+        
+        const settingsToday = isUserSettingsToday
+          ? await getUserSettings(kv, actualUserIdToday)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!settingsToday) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        // Проверяем, выбрана ли группа
+        if (!settingsToday.timetableUrl || !settingsToday.groupSlug) {
+          const faculties = await getFacultiesWithCache(kv);
+          
+          if (!faculties || faculties.length === 0) {
+            await answerCallbackQuery(
+              botToken,
+              callbackQuery.id,
+              MESSAGES.ERROR_NO_GROUP_SELECTED,
+              true
+            );
+            break;
+          }
+
+          await editMessage(botToken, chatId, messageId, MESSAGES.ERROR_NO_GROUP_SELECTED, {
+            reply_markup: createFacultySelectionKeyboard(targetChatId, faculties),
+          });
+          
+          await answerCallbackQuery(botToken, callbackQuery.id);
+          break;
+        }
+
+        // Получаем расписание
+        const today = new Date();
+        const html = await fetchTimetable(settingsToday.timetableUrl, today);
+        const timetableData = parseTimetable(html, today);
+        const timetableMessage = formatTimetableMessage(timetableData);
+
+        await editMessage(botToken, chatId, messageId, timetableMessage);
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_TIMETABLE,
+          true
+        );
+      }
+      break;
+
+    case 'select_day':
+      // Показ меню выбора дня недели
+      try {
+        const isUserSettingsDay = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdDay = isUserSettingsDay ? targetChatId.replace('user:', '') : null;
+        
+        const settingsDay = isUserSettingsDay
+          ? await getUserSettings(kv, actualUserIdDay)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!settingsDay) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        // Проверяем, выбрана ли группа
+        if (!settingsDay.timetableUrl || !settingsDay.groupSlug) {
+          const faculties = await getFacultiesWithCache(kv);
+          
+          if (!faculties || faculties.length === 0) {
+            await answerCallbackQuery(
+              botToken,
+              callbackQuery.id,
+              MESSAGES.ERROR_NO_GROUP_SELECTED,
+              true
+            );
+            break;
+          }
+
+          await editMessage(botToken, chatId, messageId, MESSAGES.ERROR_NO_GROUP_SELECTED, {
+            reply_markup: createFacultySelectionKeyboard(targetChatId, faculties),
+          });
+          
+          await answerCallbackQuery(botToken, callbackQuery.id);
+          break;
+        }
+
+        // Показываем меню выбора дня
+        await editMessage(botToken, chatId, messageId, MESSAGES.TIMETABLE_SELECT_DAY, {
+          reply_markup: createDaySelectionKeyboard(targetChatId),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'get_day':
+      // Получение расписания на выбранный день недели
+      try {
+        // Обрабатываем случай когда targetChatId = "user:userId" (5 частей) или обычный chatId (3 части)
+        // Формат: get_day:user:userId:day или get_day:chatId:day
+        const dayOfWeek = parseInt(parts[1] === 'user' ? parts[3] : parts[2]);
+        
+        const isUserSettingsGetDay = targetChatId && targetChatId.startsWith('user');
+        const actualUserIdGetDay = isUserSettingsGetDay ? targetChatId.replace('user:', '') : null;
+        
+        const settingsGetDay = isUserSettingsGetDay
+          ? await getUserSettings(kv, actualUserIdGetDay)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!settingsGetDay) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        // Проверяем, выбрана ли группа
+        if (!settingsGetDay.timetableUrl || !settingsGetDay.groupSlug) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_NO_GROUP_SELECTED,
+            true
+          );
+          break;
+        }
+
+        // Находим ближайшую дату с нужным днем недели
+        const now = new Date();
+        const currentDay = now.getDay();
+        let daysToAdd = dayOfWeek - currentDay;
+        
+        // Если день уже прошел на этой неделе или это сегодня, берем следующую неделю
+        if (daysToAdd <= 0) {
+          daysToAdd += 7;
+        }
+        
+        const targetDate = new Date(now);
+        targetDate.setDate(now.getDate() + daysToAdd);
+
+        // Получаем расписание
+        const html = await fetchTimetable(settingsGetDay.timetableUrl, targetDate);
+        const timetableData = parseTimetable(html, targetDate);
+        const timetableMessage = formatTimetableMessage(timetableData);
+
+        await editMessage(botToken, chatId, messageId, timetableMessage);
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_TIMETABLE,
           true
         );
       }

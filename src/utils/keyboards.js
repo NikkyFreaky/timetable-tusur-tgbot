@@ -2,7 +2,7 @@
  * Утилиты для создания inline клавиатур
  */
 
-import {KEYBOARD_LAYOUT} from '../config/constants.js';
+import {KEYBOARD_LAYOUT, AVAILABLE_MINUTES, DAYS_FULL} from '../config/constants.js';
 import {MESSAGES} from '../config/messages.js';
 
 /**
@@ -34,6 +34,12 @@ export function createSettingsKeyboard(chatId, settings, showBackButton = false)
         callback_data: `change_thread:${chatId}`,
       },
     ],
+    [
+      {
+        text: MESSAGES.BUTTON_CONFIGURE_TIME,
+        callback_data: `change_time:${chatId}`,
+      },
+    ],
   ];
 
   // Добавляем кнопку "Назад" если это личные сообщения
@@ -52,6 +58,123 @@ export function createSettingsKeyboard(chatId, settings, showBackButton = false)
 }
 
 /**
+ * Создает inline клавиатуру для настроек личных сообщений пользователя
+ * @param {string} userId - ID пользователя
+ * @param {Object} settings - Текущие настройки пользователя
+ * @returns {Object} Inline keyboard markup
+ */
+export function createUserSettingsKeyboard(userId, settings) {
+  const keyboard = [
+    [
+      {
+        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
+        callback_data: `get_today:user:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
+        callback_data: `select_day:user:${userId}`,
+      },
+    ],
+    [
+      {
+        text: settings.enabled
+          ? MESSAGES.BUTTON_ENABLED
+          : MESSAGES.BUTTON_DISABLED,
+        callback_data: `toggle_user_enabled:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_GROUP,
+        callback_data: `change_user_group:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_CONFIGURE_TIME,
+        callback_data: `change_user_time:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_BACK_TO_MAIN,
+        callback_data: `back_to_main:${userId}`,
+      },
+    ],
+  ];
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает главное меню для личных сообщений
+ * @param {string} userId - ID пользователя
+ * @returns {Object} Inline keyboard markup
+ */
+export function createMainMenuKeyboard(userId) {
+  const keyboard = [
+    [
+      {
+        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
+        callback_data: `get_today:user:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
+        callback_data: `select_day:user:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_MY_SETTINGS,
+        callback_data: `my_settings:${userId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_GROUP_CHATS,
+        callback_data: `group_chats:${userId}`,
+      },
+    ],
+  ];
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает клавиатуру для группового чата
+ * @param {string} chatId - ID чата
+ * @returns {Object} Inline keyboard markup
+ */
+export function createGroupChatKeyboard(chatId) {
+  const keyboard = [
+    [
+      {
+        text: MESSAGES.BUTTON_TODAY_TIMETABLE,
+        callback_data: `get_today:${chatId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_SELECT_DAY_TIMETABLE,
+        callback_data: `select_day:${chatId}`,
+      },
+    ],
+  ];
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
  * Создает inline клавиатуру для выбора чата в личных сообщениях
  * @param {Array} chats - Список чатов пользователя
  * @returns {Object} Inline keyboard markup
@@ -63,6 +186,14 @@ export function createChatsListKeyboard(chats) {
         chat.chatName || `${MESSAGES.CHAT_PREFIX} ${chat.chatId}`
       }`,
       callback_data: `select_chat:${chat.chatId}`,
+    },
+  ]);
+
+  // Добавляем кнопку "Назад в главное меню"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_MAIN,
+      callback_data: `back_to_main:0`,
     },
   ]);
 
@@ -242,3 +373,103 @@ export function createGroupSelectionKeyboard(
   };
 }
 
+/**
+ * Создает inline клавиатуру для выбора часа отправки
+ * @param {string} chatId - ID чата
+ * @param {number} currentHour - Текущий выбранный час
+ * @returns {Object} Inline keyboard markup
+ */
+export function createHourSelectionKeyboard(chatId, currentHour = 7) {
+  const keyboard = [];
+
+  // Создаем кнопки для часов от 0 до 23
+  for (let hour = 0; hour < 24; hour += KEYBOARD_LAYOUT.HOURS_PER_ROW) {
+    const row = [];
+    for (let i = 0; i < KEYBOARD_LAYOUT.HOURS_PER_ROW && hour + i < 24; i++) {
+      const h = hour + i;
+      const isSelected = h === currentHour;
+      row.push({
+        text: isSelected ? `✅ ${h}` : `${h}`,
+        callback_data: `select_hour:${chatId}:${h}`,
+      });
+    }
+    keyboard.push(row);
+  }
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_SETTINGS,
+      callback_data: `back_to_settings:${chatId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает inline клавиатуру для выбора минуты отправки
+ * @param {string} chatId - ID чата
+ * @param {number} currentMinute - Текущая выбранная минута
+ * @returns {Object} Inline keyboard markup
+ */
+export function createMinuteSelectionKeyboard(chatId, currentMinute = 0) {
+  const keyboard = [];
+
+  // Создаем кнопки для доступных минут
+  const row = [];
+  for (const minute of AVAILABLE_MINUTES) {
+    const isSelected = minute === currentMinute;
+    const minuteStr = minute.toString().padStart(2, '0');
+    row.push({
+      text: isSelected ? `✅ ${minuteStr}` : minuteStr,
+      callback_data: `select_minute:${chatId}:${minute}`,
+    });
+  }
+  keyboard.push(row);
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_SETTINGS,
+      callback_data: `back_to_settings:${chatId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает inline клавиатуру для выбора дня недели
+ * @param {string} targetId - ID чата или user:userId
+ * @returns {Object} Inline keyboard markup
+ */
+export function createDaySelectionKeyboard(targetId) {
+  const keyboard = [];
+
+  // Создаем кнопки для дней недели (пн-сб, пропускаем воскресенье)
+  for (let day = 1; day <= 6; day++) {
+    keyboard.push([
+      {
+        text: DAYS_FULL[day],
+        callback_data: `get_day:${targetId}:${day}`,
+      },
+    ]);
+  }
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_SETTINGS,
+      callback_data: `back_to_settings:${targetId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
