@@ -1041,7 +1041,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         // Получаем расписание
         const today = new Date();
-        const html = await fetchTimetable(settingsToday.timetableUrl);
+        const html = await fetchTimetable(settingsToday.timetableUrl, today);
         const timetableData = parseTimetable(html, today);
         const timetableMessage = formatTimetableMessage(timetableData);
 
@@ -1164,7 +1164,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         targetDate.setDate(now.getDate() + daysToAdd);
 
         // Получаем расписание
-        const html = await fetchTimetable(settingsGetDay.timetableUrl);
+        const html = await fetchTimetable(settingsGetDay.timetableUrl, targetDate);
         const timetableData = parseTimetable(html, targetDate);
         const timetableMessage = formatTimetableMessage(timetableData);
 

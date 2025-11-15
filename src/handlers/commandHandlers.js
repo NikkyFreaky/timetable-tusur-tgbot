@@ -424,7 +424,7 @@ async function getTimetableForDate(message, botToken, kv, date) {
 
   try {
     // Получаем и парсим расписание
-    const html = await fetchTimetable(settings.timetableUrl);
+    const html = await fetchTimetable(settings.timetableUrl, date);
     const timetableData = parseTimetable(html, date);
     const message = formatTimetableMessage(timetableData);
 

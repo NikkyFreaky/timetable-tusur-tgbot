@@ -18,7 +18,7 @@ import {getAllActiveChats, getAllActiveUsers} from './services/settingsService.j
  */
 async function sendTimetableToChat(botToken, chatSettings, date = new Date()) {
   try {
-    const html = await fetchTimetable(chatSettings.timetableUrl);
+    const html = await fetchTimetable(chatSettings.timetableUrl, date);
     const timetableData = parseTimetable(html, date);
     const message = formatTimetableMessage(timetableData);
 
@@ -69,7 +69,7 @@ async function sendTimetableToChat(botToken, chatSettings, date = new Date()) {
  */
 async function sendTimetableToUser(botToken, userSettings, date = new Date()) {
   try {
-    const html = await fetchTimetable(userSettings.timetableUrl);
+    const html = await fetchTimetable(userSettings.timetableUrl, date);
     const timetableData = parseTimetable(html, date);
     const message = formatTimetableMessage(timetableData);
 
