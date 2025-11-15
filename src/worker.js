@@ -142,20 +142,41 @@ async function handleWebhook(request, env) {
 }
 
 /**
+ * Получает текущее время в томском часовом поясе (UTC+7)
+ * @param {Date} now - Текущее время в UTC
+ * @returns {Object} Объект с часом и минутой в томском времени
+ */
+function getTomskTime(now) {
+  // Томск находится в часовом поясе UTC+7
+  const TOMSK_OFFSET = 7 * 60; // 7 часов в минутах
+  
+  // Получаем время в минутах с начала дня в UTC
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  
+  // Добавляем смещение для Томска
+  const tomskMinutes = (utcMinutes + TOMSK_OFFSET) % (24 * 60);
+  
+  return {
+    hour: Math.floor(tomskMinutes / 60),
+    minute: tomskMinutes % 60,
+  };
+}
+
+/**
  * Проверяет, должно ли расписание быть отправлено в данный момент для конкретного чата или пользователя
  * @param {Object} settings - Настройки чата или пользователя
- * @param {Date} now - Текущее время
+ * @param {Date} now - Текущее время в UTC
  * @returns {boolean} Должно ли быть отправлено расписание
  */
 function shouldSendTimetable(settings, now) {
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+  // Получаем текущее время в томском часовом поясе
+  const tomskTime = getTomskTime(now);
   
   const sendHour = settings.sendHour ?? 7;
   const sendMinute = settings.sendMinute ?? 0;
   
   // Проверяем, совпадает ли текущее время с настроенным временем отправки
-  return currentHour === sendHour && currentMinute === sendMinute;
+  return tomskTime.hour === sendHour && tomskTime.minute === sendMinute;
 }
 
 /**
@@ -219,12 +240,14 @@ async function handleScheduledTimetable(request, env) {
     );
 
     if (chatsToSend.length === 0 && usersToSend.length === 0) {
+      const tomskTime = getTomskTime(now);
       return new Response(
         JSON.stringify({
           success: true,
           skipped: true,
           reason: 'Нет чатов и пользователей для отправки в текущее время',
-          currentTime: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
+          currentTime: `${tomskTime.hour.toString().padStart(2, '0')}:${tomskTime.minute.toString().padStart(2, '0')} (Томск, UTC+7)`,
+          currentTimeUTC: `${now.getUTCHours().toString().padStart(2, '0')}:${now.getUTCMinutes().toString().padStart(2, '0')} (UTC)`,
           totalActiveChats: activeChats.length,
           totalActiveUsers: activeUsers.length,
         }),
@@ -251,6 +274,7 @@ async function handleScheduledTimetable(request, env) {
     const allResults = [...chatResults, ...userResults];
     const successCount = allResults.filter((r) => r.success).length;
     const failCount = allResults.filter((r) => !r.success).length;
+    const tomskTime = getTomskTime(now);
 
     return new Response(
       JSON.stringify({
@@ -259,7 +283,8 @@ async function handleScheduledTimetable(request, env) {
         totalUsers: usersToSend.length,
         successCount,
         failCount,
-        currentTime: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
+        currentTime: `${tomskTime.hour.toString().padStart(2, '0')}:${tomskTime.minute.toString().padStart(2, '0')} (Томск, UTC+7)`,
+        currentTimeUTC: `${now.getUTCHours().toString().padStart(2, '0')}:${now.getUTCMinutes().toString().padStart(2, '0')} (UTC)`,
         results: allResults,
       }),
       {
