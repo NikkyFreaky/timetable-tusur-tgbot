@@ -131,7 +131,7 @@ export async function handleSettingsCommand(message, botToken, kv) {
     }
 
     const threadDisplay = settings.threadName
-      ? `${settings.threadName} (ID: ${settings.threadId})`
+      ? settings.threadName
       : settings.threadId
       ? `ID: ${settings.threadId}`
       : MESSAGES.SETTINGS_NOT_SET;
@@ -350,9 +350,7 @@ export async function handleSetThreadCommand(message, botToken, kv) {
   const success = await saveChatSettings(kv, chatId.toString(), settings);
 
   if (success) {
-    const displayName = threadName
-      ? `${threadName} (ID: ${threadId})`
-      : `ID: ${threadId}`;
+    const displayName = threadName || `ID: ${threadId}`;
     await sendMessage(
       botToken,
       chatId,

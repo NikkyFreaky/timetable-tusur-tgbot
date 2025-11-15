@@ -33,7 +33,7 @@ import {
  */
 function formatSettingsText(settings) {
   const threadDisplay = settings.threadName
-    ? `${settings.threadName} (ID: ${settings.threadId})`
+    ? settings.threadName
     : settings.threadId
     ? `ID: ${settings.threadId}`
     : MESSAGES.SETTINGS_NOT_SET;
@@ -314,7 +314,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         await saveChatSettings(kv, targetChatId, settings);
 
         const groupThreadDisplay = settings.threadName
-          ? `${settings.threadName} (ID: ${settings.threadId})`
+          ? settings.threadName
           : settings.threadId
           ? `ID: ${settings.threadId}`
           : MESSAGES.SETTINGS_NOT_SET;
