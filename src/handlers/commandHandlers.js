@@ -328,24 +328,39 @@ export async function handleSetThreadCommand(message, botToken, kv) {
     return;
   }
 
-  // Получаем название темы из сообщения (если это форум)
-  const threadName =
-    message.reply_to_message?.forum_topic_created?.name ||
-    message.is_topic_message
-      ? `${MESSAGES.TOPIC_PREFIX} ${threadId}`
-      : null;
+  // Пытаемся получить название темы из разных источников
+  let threadName = null;
+  
+  // 1. Из сообщения о создании топика
+  if (message.forum_topic_created) {
+    threadName = message.forum_topic_created.name;
+  }
+  // 2. Из ответа на сообщение с информацией о топике
+  else if (message.reply_to_message?.forum_topic_created) {
+    threadName = message.reply_to_message.forum_topic_created.name;
+  }
+  // 3. Из редактирования топика
+  else if (message.forum_topic_edited) {
+    threadName = message.forum_topic_edited.name;
+  }
+  // 4. Из существующего кэша
+  else if (settings.forumTopics?.[threadId.toString()]) {
+    threadName = settings.forumTopics[threadId.toString()];
+  }
+  // 5. Если ничего не нашли, используем ID
+  else {
+    threadName = `${MESSAGES.TOPIC_PREFIX} ${threadId}`;
+  }
 
   // Обновляем настройки
   settings.threadId = threadId.toString();
   settings.threadName = threadName;
 
-  // Добавляем тему в кэш доступных топиков
+  // Добавляем/обновляем тему в кэше доступных топиков
   if (!settings.forumTopics) {
     settings.forumTopics = {};
   }
-  if (threadName) {
-    settings.forumTopics[threadId.toString()] = threadName;
-  }
+  settings.forumTopics[threadId.toString()] = threadName;
 
   const success = await saveChatSettings(kv, chatId.toString(), settings);
 

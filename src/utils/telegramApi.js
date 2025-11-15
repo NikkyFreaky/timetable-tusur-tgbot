@@ -182,6 +182,31 @@ export async function getChatInfo(botToken, chatId) {
 }
 
 /**
+ * Получает список тем форума
+ * @param {string} botToken - Токен бота
+ * @param {string} chatId - ID чата
+ * @returns {Promise<Array>} Список тем или пустой массив
+ */
+export async function getForumTopics(botToken, chatId) {
+  try {
+    const url = `${TELEGRAM_API.BASE_URL}${botToken}/getForumTopicIconStickers`;
+    
+    // Сначала проверим, является ли чат форумом
+    const chatInfo = await getChatInfo(botToken, chatId);
+    if (!chatInfo || !chatInfo.is_forum) {
+      return [];
+    }
+
+    // К сожалению, Telegram Bot API не предоставляет прямого метода для получения списка топиков
+    // Топики нужно кэшировать при получении сообщений
+    return [];
+  } catch (error) {
+    console.error('Ошибка при получении списка тем:', error);
+    return [];
+  }
+}
+
+/**
  * Отправляет расписание в указанную тему чата
  * @param {string} botToken - Токен бота
  * @param {string} chatId - ID чата
