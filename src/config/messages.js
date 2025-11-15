@@ -50,6 +50,7 @@ export const MESSAGES = {
   SETTINGS_GROUP: '<b>Группа:</b>',
   SETTINGS_THREAD: '<b>Тема:</b>',
   SETTINGS_URL: '<b>URL расписания:</b>',
+  SETTINGS_SEND_TIME: '<b>Время отправки:</b>',
   SETTINGS_NOT_SET: '➖ Не установлена',
   SETTINGS_NOT_SELECTED: '➖ Не выбрана',
 
@@ -90,6 +91,7 @@ export const MESSAGES = {
   BUTTON_DISABLED: '❌ Выключен',
   BUTTON_SELECT_GROUP: '📚 Выбрать группу',
   BUTTON_CONFIGURE_THREAD: '💬 Настроить тему',
+  BUTTON_CONFIGURE_TIME: '⏰ Настроить время',
   BUTTON_BACK_TO_SETTINGS: '◀️ Назад к настройкам',
   BUTTON_BACK_TO_FACULTIES: '◀️ Назад к факультетам',
   BUTTON_BACK_TO_COURSES: '◀️ Назад к курсам',
@@ -130,6 +132,13 @@ export const MESSAGES = {
   TIMETABLE_AUDITORIUM: '<b>🏫 Аудитория:</b>',
   TIMETABLE_TEACHER: '<b>👨‍🏫 Преподаватель:</b>',
   TIMETABLE_TOTAL: '<b>📊 Всего пар:</b>',
+
+  // Время отправки
+  TIME_SELECTION_HEADER: '⏰ <b>Настройка времени отправки</b>\n\n',
+  TIME_SELECTION_HOUR: 'Выберите час (0-23):',
+  TIME_SELECTION_MINUTE: 'Выберите минуту:',
+  TIME_SET_SUCCESS: '✅ Время отправки установлено:',
+  TIME_CURRENT: 'Текущее время отправки:',
 
   // Разное
   UNKNOWN_COMMAND: '❌ Неизвестная команда',

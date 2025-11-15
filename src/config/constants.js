@@ -50,6 +50,8 @@ export const DEFAULT_CHAT_SETTINGS = {
   timetableUrl: 'https://timetable.tusur.ru/faculties/fsu/groups/425-m',
   enabled: true,
   adminIds: [],
+  sendHour: 7, // Час отправки (0-23)
+  sendMinute: 0, // Минута отправки (0 или 30)
 };
 
 // Настройки дебаунса для предотвращения дублирования запросов
@@ -85,5 +87,10 @@ export const PARSE_MODE = 'HTML';
 export const KEYBOARD_LAYOUT = {
   COURSES_PER_ROW: 2,
   GROUPS_PER_ROW: 2,
+  HOURS_PER_ROW: 6,
+  MINUTES_PER_ROW: 2,
 };
+
+// Доступные минуты для выбора времени отправки
+export const AVAILABLE_MINUTES = [0, 30];
 

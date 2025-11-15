@@ -2,7 +2,7 @@
  * Утилиты для создания inline клавиатур
  */
 
-import {KEYBOARD_LAYOUT} from '../config/constants.js';
+import {KEYBOARD_LAYOUT, AVAILABLE_MINUTES} from '../config/constants.js';
 import {MESSAGES} from '../config/messages.js';
 
 /**
@@ -32,6 +32,12 @@ export function createSettingsKeyboard(chatId, settings, showBackButton = false)
       {
         text: MESSAGES.BUTTON_CONFIGURE_THREAD,
         callback_data: `change_thread:${chatId}`,
+      },
+    ],
+    [
+      {
+        text: MESSAGES.BUTTON_CONFIGURE_TIME,
+        callback_data: `change_time:${chatId}`,
       },
     ],
   ];
@@ -234,6 +240,76 @@ export function createGroupSelectionKeyboard(
     {
       text: MESSAGES.BUTTON_BACK_TO_COURSES,
       callback_data: `back_to_courses:${chatId}:${facultySlug}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает inline клавиатуру для выбора часа отправки
+ * @param {string} chatId - ID чата
+ * @param {number} currentHour - Текущий выбранный час
+ * @returns {Object} Inline keyboard markup
+ */
+export function createHourSelectionKeyboard(chatId, currentHour = 7) {
+  const keyboard = [];
+
+  // Создаем кнопки для часов от 0 до 23
+  for (let hour = 0; hour < 24; hour += KEYBOARD_LAYOUT.HOURS_PER_ROW) {
+    const row = [];
+    for (let i = 0; i < KEYBOARD_LAYOUT.HOURS_PER_ROW && hour + i < 24; i++) {
+      const h = hour + i;
+      const isSelected = h === currentHour;
+      row.push({
+        text: isSelected ? `✅ ${h}` : `${h}`,
+        callback_data: `select_hour:${chatId}:${h}`,
+      });
+    }
+    keyboard.push(row);
+  }
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_SETTINGS,
+      callback_data: `back_to_settings:${chatId}`,
+    },
+  ]);
+
+  return {
+    inline_keyboard: keyboard,
+  };
+}
+
+/**
+ * Создает inline клавиатуру для выбора минуты отправки
+ * @param {string} chatId - ID чата
+ * @param {number} currentMinute - Текущая выбранная минута
+ * @returns {Object} Inline keyboard markup
+ */
+export function createMinuteSelectionKeyboard(chatId, currentMinute = 0) {
+  const keyboard = [];
+
+  // Создаем кнопки для доступных минут
+  const row = [];
+  for (const minute of AVAILABLE_MINUTES) {
+    const isSelected = minute === currentMinute;
+    const minuteStr = minute.toString().padStart(2, '0');
+    row.push({
+      text: isSelected ? `✅ ${minuteStr}` : minuteStr,
+      callback_data: `select_minute:${chatId}:${minute}`,
+    });
+  }
+  keyboard.push(row);
+
+  // Добавляем кнопку "Назад"
+  keyboard.push([
+    {
+      text: MESSAGES.BUTTON_BACK_TO_SETTINGS,
+      callback_data: `back_to_settings:${chatId}`,
     },
   ]);
 

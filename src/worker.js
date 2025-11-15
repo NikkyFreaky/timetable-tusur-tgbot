@@ -101,6 +101,23 @@ async function handleWebhook(request, env) {
 }
 
 /**
+ * Проверяет, должно ли расписание быть отправлено в данный момент для конкретного чата
+ * @param {Object} chatSettings - Настройки чата
+ * @param {Date} now - Текущее время
+ * @returns {boolean} Должно ли быть отправлено расписание
+ */
+function shouldSendTimetable(chatSettings, now) {
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  
+  const sendHour = chatSettings.sendHour ?? 7;
+  const sendMinute = chatSettings.sendMinute ?? 0;
+  
+  // Проверяем, совпадает ли текущее время с настроенным временем отправки
+  return currentHour === sendHour && currentMinute === sendMinute;
+}
+
+/**
  * Основная функция обработки запроса на отправку расписания по расписанию
  * @param {Request} request - HTTP запрос
  * @param {Object} env - Переменные окружения
@@ -150,9 +167,30 @@ async function handleScheduledTimetable(request, env) {
       );
     }
 
-    // Отправляем расписание во все активные чаты
+    // Фильтруем чаты, для которых настало время отправки
+    const chatsToSend = activeChats.filter((chatSettings) =>
+      shouldSendTimetable(chatSettings, now)
+    );
+
+    if (chatsToSend.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          skipped: true,
+          reason: 'Нет чатов для отправки в текущее время',
+          currentTime: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
+          totalActiveChats: activeChats.length,
+        }),
+        {
+          status: 200,
+          headers: {'Content-Type': 'application/json'},
+        }
+      );
+    }
+
+    // Отправляем расписание в чаты, для которых настало время
     const results = await Promise.all(
-      activeChats.map((chatSettings) =>
+      chatsToSend.map((chatSettings) =>
         sendTimetableToChat(env.BOT_TOKEN, chatSettings, now)
       )
     );
@@ -163,9 +201,10 @@ async function handleScheduledTimetable(request, env) {
     return new Response(
       JSON.stringify({
         success: true,
-        totalChats: activeChats.length,
+        totalChats: chatsToSend.length,
         successCount,
         failCount,
+        currentTime: `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`,
         results,
       }),
       {

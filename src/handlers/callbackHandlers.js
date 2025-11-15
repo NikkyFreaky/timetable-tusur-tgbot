@@ -26,6 +26,8 @@ import {
   createGroupSelectionKeyboard,
   createSettingsKeyboard,
   createThreadSelectionKeyboard,
+  createHourSelectionKeyboard,
+  createMinuteSelectionKeyboard,
 } from '../utils/keyboards.js';
 
 /**
@@ -44,6 +46,10 @@ function formatSettingsText(settings) {
     ? settings.groupSlug.toUpperCase()
     : MESSAGES.SETTINGS_NOT_SELECTED;
 
+  const sendHour = settings.sendHour ?? 7;
+  const sendMinute = settings.sendMinute ?? 0;
+  const timeDisplay = `${sendHour.toString().padStart(2, '0')}:${sendMinute.toString().padStart(2, '0')}`;
+
   return (
     MESSAGES.SETTINGS_HEADER +
     `${MESSAGES.SETTINGS_CHAT_NAME} ${
@@ -53,7 +59,8 @@ function formatSettingsText(settings) {
       settings.enabled ? MESSAGES.STATUS_ENABLED : MESSAGES.STATUS_DISABLED
     }\n` +
     `${MESSAGES.SETTINGS_GROUP} ${groupDisplay}\n` +
-    `${MESSAGES.SETTINGS_THREAD} ${threadDisplay}\n\n` +
+    `${MESSAGES.SETTINGS_THREAD} ${threadDisplay}\n` +
+    `${MESSAGES.SETTINGS_SEND_TIME} ${timeDisplay}\n\n` +
     MESSAGES.SETTINGS_SELECT_PARAMETER
   );
 }
@@ -434,6 +441,89 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
         console.error('Ошибка при возврате к курсам:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'change_time':
+      // Показываем выбор часа
+      try {
+        const currentHour = settings.sendHour ?? 7;
+        const currentMinute = settings.sendMinute ?? 0;
+        const timeText =
+          MESSAGES.TIME_SELECTION_HEADER +
+          `${MESSAGES.TIME_CURRENT} ${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}\n\n` +
+          MESSAGES.TIME_SELECTION_HOUR;
+
+        await editMessage(botToken, chatId, messageId, timeText, {
+          reply_markup: createHourSelectionKeyboard(targetChatId, currentHour),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при открытии выбора времени:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'select_hour':
+      // Выбор часа - показываем выбор минут
+      try {
+        const selectedHour = parseInt(parts[2]);
+        settings.sendHour = selectedHour;
+        await saveChatSettings(kv, targetChatId, settings);
+
+        const currentMinute = settings.sendMinute ?? 0;
+        const minuteText =
+          MESSAGES.TIME_SELECTION_HEADER +
+          `${MESSAGES.TIME_CURRENT} ${selectedHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}\n\n` +
+          MESSAGES.TIME_SELECTION_MINUTE;
+
+        await editMessage(botToken, chatId, messageId, minuteText, {
+          reply_markup: createMinuteSelectionKeyboard(targetChatId, currentMinute),
+        });
+
+        await answerCallbackQuery(botToken, callbackQuery.id);
+      } catch (error) {
+        console.error('Ошибка при выборе часа:', error);
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          MESSAGES.ERROR_LOADING,
+          true
+        );
+      }
+      break;
+
+    case 'select_minute':
+      // Выбор минуты - сохраняем и возвращаемся к настройкам
+      try {
+        const selectedMinute = parseInt(parts[2]);
+        settings.sendMinute = selectedMinute;
+        await saveChatSettings(kv, targetChatId, settings);
+
+        await editMessage(botToken, chatId, messageId, formatSettingsText(settings), {
+          reply_markup: createSettingsKeyboard(targetChatId, settings, isPrivateChat),
+        });
+
+        const timeStr = `${settings.sendHour.toString().padStart(2, '0')}:${settings.sendMinute.toString().padStart(2, '0')}`;
+        await answerCallbackQuery(
+          botToken,
+          callbackQuery.id,
+          `${MESSAGES.TIME_SET_SUCCESS} ${timeStr}`
+        );
+      } catch (error) {
+        console.error('Ошибка при выборе минуты:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
