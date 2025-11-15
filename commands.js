@@ -4,11 +4,11 @@
 
 import {
   getChatSettings,
-  saveChatSettings,
   getUserChats,
   initializeChatSettings,
-  updateChatSetting,
   isUserAdmin,
+  saveChatSettings,
+  updateChatSetting,
 } from './settings.js';
 import {getChatInfo} from './telegram.js';
 
@@ -58,7 +58,7 @@ export async function checkTelegramAdmin(botToken, chatId, userId) {
  */
 export async function sendMessage(botToken, chatId, text, options = {}) {
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-  
+
   const body = {
     chat_id: chatId,
     text: text,
@@ -89,9 +89,15 @@ export async function sendMessage(botToken, chatId, text, options = {}) {
  * @param {Object} options - Дополнительные опции
  * @returns {Promise<Object>} Ответ от Telegram API
  */
-export async function editMessage(botToken, chatId, messageId, text, options = {}) {
+export async function editMessage(
+  botToken,
+  chatId,
+  messageId,
+  text,
+  options = {}
+) {
   const url = `https://api.telegram.org/bot${botToken}/editMessageText`;
-  
+
   const body = {
     chat_id: chatId,
     message_id: messageId,
@@ -122,9 +128,14 @@ export async function editMessage(botToken, chatId, messageId, text, options = {
  * @param {boolean} showAlert - Показать как alert
  * @returns {Promise<Object>} Ответ от Telegram API
  */
-export async function answerCallbackQuery(botToken, callbackQueryId, text = '', showAlert = false) {
+export async function answerCallbackQuery(
+  botToken,
+  callbackQueryId,
+  text = '',
+  showAlert = false
+) {
   const url = `https://api.telegram.org/bot${botToken}/answerCallbackQuery`;
-  
+
   const body = {
     callback_query_id: callbackQueryId,
     text: text,
@@ -155,19 +166,19 @@ function createSettingsKeyboard(chatId, settings) {
   const keyboard = [
     [
       {
-        text: settings.enabled ? '✅ Включен' : '❌ Выключен',
+        text: settings.enabled ? 'Включен' : 'Выключен',
         callback_data: `toggle_enabled:${chatId}`,
       },
     ],
     [
       {
-        text: '🔗 Изменить URL расписания',
+        text: 'Изменить URL расписания',
         callback_data: `change_url:${chatId}`,
       },
     ],
     [
       {
-        text: '📍 Настроить тему (thread)',
+        text: 'Настроить тему',
         callback_data: `change_thread:${chatId}`,
       },
     ],
@@ -186,7 +197,9 @@ function createSettingsKeyboard(chatId, settings) {
 function createChatsListKeyboard(chats) {
   const keyboard = chats.map((chat) => [
     {
-      text: `${chat.enabled ? '✅' : '❌'} ${chat.chatName || `Чат ${chat.chatId}`}`,
+      text: `${chat.enabled ? '[Вкл] ' : '[Выкл] '}${
+        chat.chatName || `Чат ${chat.chatId}`
+      }`,
       callback_data: `select_chat:${chat.chatId}`,
     },
   ]);
@@ -204,7 +217,7 @@ function createChatsListKeyboard(chats) {
  */
 function createThreadSelectionKeyboard(chatId, forumTopics) {
   const keyboard = [];
-  
+
   if (forumTopics && Object.keys(forumTopics).length > 0) {
     for (const [threadId, threadName] of Object.entries(forumTopics)) {
       keyboard.push([
@@ -217,16 +230,16 @@ function createThreadSelectionKeyboard(chatId, forumTopics) {
   } else {
     keyboard.push([
       {
-        text: '⚠️ Нет доступных тем',
+        text: 'Нет доступных тем',
         callback_data: `no_threads:${chatId}`,
       },
     ]);
   }
-  
+
   // Добавляем кнопку "Назад"
   keyboard.push([
     {
-      text: '« Назад к настройкам',
+      text: 'Назад к настройкам',
       callback_data: `back_to_settings:${chatId}`,
     },
   ]);
@@ -251,17 +264,18 @@ export async function handleStartCommand(message, botToken, kv) {
   if (isPrivate) {
     // В личных сообщениях показываем список чатов
     const userChats = await getUserChats(kv, userId.toString());
-    
-    let text = '<b>👋 Добро пожаловать в бот расписания ТУСУР!</b>\n\n';
-    
+
+    let text = '<b>Добро пожаловать в бот расписания ТУСУР!</b>\n\n';
+
     if (userChats.length === 0) {
       text += 'У вас пока нет настроенных чатов.\n\n';
-      text += 'Добавьте бота в групповой чат, и вы сможете управлять им отсюда.';
-      
+      text +=
+        'Добавьте бота в групповой чат, и вы сможете управлять им отсюда.';
+
       await sendMessage(botToken, chatId, text);
     } else {
       text += 'Выберите чат для настройки:';
-      
+
       await sendMessage(botToken, chatId, text, {
         reply_markup: createChatsListKeyboard(userChats),
       });
@@ -269,11 +283,16 @@ export async function handleStartCommand(message, botToken, kv) {
   } else {
     // В групповом чате инициализируем настройки
     const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
-    
+
     if (!isAdmin) {
-      await sendMessage(botToken, chatId, 'Только администраторы могут настраивать бота.', {
-        message_thread_id: message.message_thread_id,
-      });
+      await sendMessage(
+        botToken,
+        chatId,
+        'Только администраторы могут настраивать бота.',
+        {
+          message_thread_id: message.message_thread_id,
+        }
+      );
       return;
     }
 
@@ -281,21 +300,32 @@ export async function handleStartCommand(message, botToken, kv) {
     const chatInfo = await getChatInfo(botToken, chatId);
     const chatName = chatInfo?.title || `Чат ${chatId}`;
 
-    const settings = await initializeChatSettings(kv, chatId.toString(), userId.toString(), {
-      chatName: chatName,
-    });
-    
+    const settings = await initializeChatSettings(
+      kv,
+      chatId.toString(),
+      userId.toString(),
+      {
+        chatName: chatName,
+      }
+    );
+
     if (settings) {
-      const text = '<b>✅ Бот успешно настроен!</b>\n\n' +
+      const text =
+        '<b>Бот успешно настроен!</b>\n\n' +
         'Используйте команду /settings для настройки параметров.';
-      
+
       await sendMessage(botToken, chatId, text, {
         message_thread_id: message.message_thread_id,
       });
     } else {
-      await sendMessage(botToken, chatId, 'Произошла ошибка при настройке бота.', {
-        message_thread_id: message.message_thread_id,
-      });
+      await sendMessage(
+        botToken,
+        chatId,
+        'Произошла ошибка при настройке бота.',
+        {
+          message_thread_id: message.message_thread_id,
+        }
+      );
     }
   }
 }
@@ -315,7 +345,7 @@ export async function handleSettingsCommand(message, botToken, kv) {
   if (isPrivate) {
     // В личных сообщениях показываем список чатов
     const userChats = await getUserChats(kv, userId.toString());
-    
+
     if (userChats.length === 0) {
       await sendMessage(botToken, chatId, 'У вас нет настроенных чатов.');
       return;
@@ -327,20 +357,30 @@ export async function handleSettingsCommand(message, botToken, kv) {
   } else {
     // В групповом чате показываем настройки
     const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
-    
+
     if (!isAdmin) {
-      await sendMessage(botToken, chatId, 'Только администраторы могут просматривать настройки.', {
-        message_thread_id: message.message_thread_id,
-      });
+      await sendMessage(
+        botToken,
+        chatId,
+        'Только администраторы могут просматривать настройки.',
+        {
+          message_thread_id: message.message_thread_id,
+        }
+      );
       return;
     }
 
     const settings = await getChatSettings(kv, chatId.toString());
-    
+
     if (!settings) {
-      await sendMessage(botToken, chatId, 'Настройки не найдены. Используйте /start для инициализации.', {
-        message_thread_id: message.message_thread_id,
-      });
+      await sendMessage(
+        botToken,
+        chatId,
+        'Настройки не найдены. Используйте /start для инициализации.',
+        {
+          message_thread_id: message.message_thread_id,
+        }
+      );
       return;
     }
 
@@ -351,13 +391,18 @@ export async function handleSettingsCommand(message, botToken, kv) {
       await saveChatSettings(kv, chatId.toString(), settings);
     }
 
-    const threadDisplay = settings.threadName 
+    const threadDisplay = settings.threadName
       ? `${settings.threadName} (ID: ${settings.threadId})`
-      : (settings.threadId ? `ID: ${settings.threadId}` : 'Не установлена');
+      : settings.threadId
+      ? `ID: ${settings.threadId}`
+      : 'Не установлена';
 
-    const text = '<b>⚙️ Настройки чата</b>\n\n' +
-      `<b>Название чата:</b> ${settings.chatName || `ID: ${settings.chatId}`}\n` +
-      `<b>Статус:</b> ${settings.enabled ? '✅ Включен' : '❌ Выключен'}\n` +
+    const text =
+      '<b>Настройки чата</b>\n\n' +
+      `<b>Название чата:</b> ${
+        settings.chatName || `ID: ${settings.chatId}`
+      }\n` +
+      `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
       `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
       `<b>Тема (thread):</b> ${threadDisplay}\n\n` +
       'Выберите параметр для изменения:';
@@ -379,7 +424,8 @@ export async function handleHelpCommand(message, botToken) {
   const chatId = message.chat.id;
   const isPrivate = message.chat.type === 'private';
 
-  const text = '<b>📚 Справка по командам</b>\n\n' +
+  const text =
+    '<b>Справка по командам</b>\n\n' +
     '/start - Начать работу с ботом\n' +
     '/settings - Настройки бота\n' +
     '/help - Показать эту справку\n' +
@@ -389,7 +435,9 @@ export async function handleHelpCommand(message, botToken) {
     '2. Используйте /start для инициализации\n' +
     '3. Настройте параметры через /settings\n' +
     '4. Бот будет автоматически отправлять расписание по расписанию\n\n' +
-    (isPrivate ? 'Вы также можете управлять всеми чатами из личных сообщений!' : '');
+    (isPrivate
+      ? 'Вы также можете управлять всеми чатами из личных сообщений!'
+      : '');
 
   await sendMessage(botToken, chatId, text, {
     message_thread_id: message.message_thread_id,
@@ -410,15 +458,15 @@ export async function handleStatusCommand(message, botToken, kv) {
 
   if (isPrivate) {
     const userChats = await getUserChats(kv, userId.toString());
-    
-    let text = '<b>📊 Статус ваших чатов</b>\n\n';
-    
+
+    let text = '<b>Статус ваших чатов</b>\n\n';
+
     if (userChats.length === 0) {
       text += 'У вас нет настроенных чатов.';
     } else {
       userChats.forEach((chat, index) => {
         text += `${index + 1}. Чат ${chat.chatId}\n`;
-        text += `   Статус: ${chat.enabled ? '✅ Активен' : '❌ Выключен'}\n`;
+        text += `   Статус: ${chat.enabled ? 'Активен' : 'Выключен'}\n`;
         text += `   URL: ${chat.timetableUrl}\n\n`;
       });
     }
@@ -426,16 +474,22 @@ export async function handleStatusCommand(message, botToken, kv) {
     await sendMessage(botToken, chatId, text);
   } else {
     const settings = await getChatSettings(kv, chatId.toString());
-    
+
     if (!settings) {
-      await sendMessage(botToken, chatId, 'Бот не настроен. Используйте /start для инициализации.', {
-        message_thread_id: message.message_thread_id,
-      });
+      await sendMessage(
+        botToken,
+        chatId,
+        'Бот не настроен. Используйте /start для инициализации.',
+        {
+          message_thread_id: message.message_thread_id,
+        }
+      );
       return;
     }
 
-    const text = '<b>📊 Статус бота</b>\n\n' +
-      `Статус: ${settings.enabled ? '✅ Активен' : '❌ Выключен'}\n` +
+    const text =
+      '<b>Статус бота</b>\n\n' +
+      `Статус: ${settings.enabled ? 'Активен' : 'Выключен'}\n` +
       `URL расписания: ${settings.timetableUrl}\n` +
       `Тема (thread): ${settings.threadId || 'Не установлена'}\n` +
       `Создан: ${new Date(settings.createdAt).toLocaleString('ru-RU')}\n` +
@@ -470,14 +524,24 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
   const isAdminInKV = await isUserAdmin(kv, targetChatId, userId.toString());
 
   if (!isAdmin && !isAdminInKV) {
-    await answerCallbackQuery(botToken, callbackQuery.id, 'У вас нет прав для этого действия', true);
+    await answerCallbackQuery(
+      botToken,
+      callbackQuery.id,
+      'У вас нет прав для этого действия',
+      true
+    );
     return;
   }
 
   const settings = await getChatSettings(kv, targetChatId);
-  
+
   if (!settings) {
-    await answerCallbackQuery(botToken, callbackQuery.id, 'Настройки не найдены', true);
+    await answerCallbackQuery(
+      botToken,
+      callbackQuery.id,
+      'Настройки не найдены',
+      true
+    );
     return;
   }
 
@@ -485,14 +549,19 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'toggle_enabled':
       settings.enabled = !settings.enabled;
       await saveChatSettings(kv, targetChatId, settings);
-      
-      const statusThreadDisplay = settings.threadName 
-        ? `${settings.threadName} (ID: ${settings.threadId})`
-        : (settings.threadId ? `ID: ${settings.threadId}` : 'Не установлена');
 
-      const statusText = '<b>⚙️ Настройки чата</b>\n\n' +
-        `<b>Название чата:</b> ${settings.chatName || `ID: ${settings.chatId}`}\n` +
-        `<b>Статус:</b> ${settings.enabled ? '✅ Включен' : '❌ Выключен'}\n` +
+      const statusThreadDisplay = settings.threadName
+        ? `${settings.threadName} (ID: ${settings.threadId})`
+        : settings.threadId
+        ? `ID: ${settings.threadId}`
+        : 'Не установлена';
+
+      const statusText =
+        '<b>Настройки чата</b>\n\n' +
+        `<b>Название чата:</b> ${
+          settings.chatName || `ID: ${settings.chatId}`
+        }\n` +
+        `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
         `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
         `<b>Тема (thread):</b> ${statusThreadDisplay}\n\n` +
         'Выберите параметр для изменения:';
@@ -500,36 +569,51 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await editMessage(botToken, chatId, messageId, statusText, {
         reply_markup: createSettingsKeyboard(targetChatId, settings),
       });
-      
-      await answerCallbackQuery(botToken, callbackQuery.id, 
-        settings.enabled ? 'Бот включен' : 'Бот выключен');
+
+      await answerCallbackQuery(
+        botToken,
+        callbackQuery.id,
+        settings.enabled ? 'Бот включен' : 'Бот выключен'
+      );
       break;
 
     case 'change_url':
-      await answerCallbackQuery(botToken, callbackQuery.id, 
-        'Отправьте новый URL расписания в формате: /seturl <URL>');
+      await answerCallbackQuery(
+        botToken,
+        callbackQuery.id,
+        'Отправьте новый URL расписания в формате: /seturl <URL>'
+      );
       break;
 
     case 'change_thread':
       // Показываем список доступных тем
-      const threadsText = '<b>📍 Выбор темы для отправки расписания</b>\n\n' +
+      const threadsText =
+        '<b>Выбор темы для отправки расписания</b>\n\n' +
         'Выберите тему из списка ниже:';
-      
+
       await editMessage(botToken, chatId, messageId, threadsText, {
-        reply_markup: createThreadSelectionKeyboard(targetChatId, settings.forumTopics || {}),
+        reply_markup: createThreadSelectionKeyboard(
+          targetChatId,
+          settings.forumTopics || {}
+        ),
       });
-      
+
       await answerCallbackQuery(botToken, callbackQuery.id);
       break;
 
     case 'select_chat':
-      const threadDisplay = settings.threadName 
+      const threadDisplay = settings.threadName
         ? `${settings.threadName} (ID: ${settings.threadId})`
-        : (settings.threadId ? `ID: ${settings.threadId}` : 'Не установлена');
+        : settings.threadId
+        ? `ID: ${settings.threadId}`
+        : 'Не установлена';
 
-      const chatText = '<b>⚙️ Настройки чата</b>\n\n' +
-        `<b>Название чата:</b> ${settings.chatName || `ID: ${settings.chatId}`}\n` +
-        `<b>Статус:</b> ${settings.enabled ? '✅ Включен' : '❌ Выключен'}\n` +
+      const chatText =
+        '<b>Настройки чата</b>\n\n' +
+        `<b>Название чата:</b> ${
+          settings.chatName || `ID: ${settings.chatId}`
+        }\n` +
+        `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
         `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
         `<b>Тема (thread):</b> ${threadDisplay}\n\n` +
         'Выберите параметр для изменения:';
@@ -537,26 +621,30 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await editMessage(botToken, chatId, messageId, chatText, {
         reply_markup: createSettingsKeyboard(targetChatId, settings),
       });
-      
+
       await answerCallbackQuery(botToken, callbackQuery.id);
       break;
 
     case 'select_thread':
       // Выбор конкретной темы
       const selectedThreadId = parts[2];
-      const selectedThreadName = settings.forumTopics?.[selectedThreadId] || `Тема ${selectedThreadId}`;
-      
+      const selectedThreadName =
+        settings.forumTopics?.[selectedThreadId] || `Тема ${selectedThreadId}`;
+
       settings.threadId = selectedThreadId;
       settings.threadName = selectedThreadName;
       await saveChatSettings(kv, targetChatId, settings);
-      
-      const successThreadDisplay = settings.threadName 
+
+      const successThreadDisplay = settings.threadName
         ? `${settings.threadName} (ID: ${settings.threadId})`
         : `ID: ${settings.threadId}`;
 
-      const successText = '<b>⚙️ Настройки чата</b>\n\n' +
-        `<b>Название чата:</b> ${settings.chatName || `ID: ${settings.chatId}`}\n` +
-        `<b>Статус:</b> ${settings.enabled ? '✅ Включен' : '❌ Выключен'}\n` +
+      const successText =
+        '<b>Настройки чата</b>\n\n' +
+        `<b>Название чата:</b> ${
+          settings.chatName || `ID: ${settings.chatId}`
+        }\n` +
+        `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
         `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
         `<b>Тема (thread):</b> ${successThreadDisplay}\n\n` +
         'Выберите параметр для изменения:';
@@ -564,19 +652,28 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await editMessage(botToken, chatId, messageId, successText, {
         reply_markup: createSettingsKeyboard(targetChatId, settings),
       });
-      
-      await answerCallbackQuery(botToken, callbackQuery.id, `✅ Тема установлена: ${selectedThreadName}`);
+
+      await answerCallbackQuery(
+        botToken,
+        callbackQuery.id,
+        `Тема установлена: ${selectedThreadName}`
+      );
       break;
 
     case 'back_to_settings':
       // Возврат к настройкам
-      const backThreadDisplay = settings.threadName 
+      const backThreadDisplay = settings.threadName
         ? `${settings.threadName} (ID: ${settings.threadId})`
-        : (settings.threadId ? `ID: ${settings.threadId}` : 'Не установлена');
+        : settings.threadId
+        ? `ID: ${settings.threadId}`
+        : 'Не установлена';
 
-      const backText = '<b>⚙️ Настройки чата</b>\n\n' +
-        `<b>Название чата:</b> ${settings.chatName || `ID: ${settings.chatId}`}\n` +
-        `<b>Статус:</b> ${settings.enabled ? '✅ Включен' : '❌ Выключен'}\n` +
+      const backText =
+        '<b>Настройки чата</b>\n\n' +
+        `<b>Название чата:</b> ${
+          settings.chatName || `ID: ${settings.chatId}`
+        }\n` +
+        `<b>Статус:</b> ${settings.enabled ? 'Включен' : 'Выключен'}\n` +
         `<b>URL расписания:</b> ${settings.timetableUrl}\n` +
         `<b>Тема (thread):</b> ${backThreadDisplay}\n\n` +
         'Выберите параметр для изменения:';
@@ -584,17 +681,25 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       await editMessage(botToken, chatId, messageId, backText, {
         reply_markup: createSettingsKeyboard(targetChatId, settings),
       });
-      
+
       await answerCallbackQuery(botToken, callbackQuery.id);
       break;
 
     case 'no_threads':
-      await answerCallbackQuery(botToken, callbackQuery.id, 
-        'Нет доступных тем. Отправьте команду /setthread в нужной теме чата.', true);
+      await answerCallbackQuery(
+        botToken,
+        callbackQuery.id,
+        'Нет доступных тем. Отправьте команду /setthread в нужной теме чата.',
+        true
+      );
       break;
 
     default:
-      await answerCallbackQuery(botToken, callbackQuery.id, 'Неизвестная команда');
+      await answerCallbackQuery(
+        botToken,
+        callbackQuery.id,
+        'Неизвестная команда'
+      );
   }
 }
 
@@ -611,29 +716,44 @@ export async function handleSetUrlCommand(message, botToken, kv, url) {
   const userId = message.from.id;
 
   const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
-  
+
   if (!isAdmin) {
-    await sendMessage(botToken, chatId, 'Только администраторы могут изменять настройки.', {
-      message_thread_id: message.message_thread_id,
-    });
+    await sendMessage(
+      botToken,
+      chatId,
+      'Только администраторы могут изменять настройки.',
+      {
+        message_thread_id: message.message_thread_id,
+      }
+    );
     return;
   }
 
   if (!url || !url.startsWith('http')) {
-    await sendMessage(botToken, chatId, 'Пожалуйста, укажите корректный URL.\nПример: /seturl https://timetable.tusur.ru/faculties/fsu/groups/425-m', {
-      message_thread_id: message.message_thread_id,
-    });
+    await sendMessage(
+      botToken,
+      chatId,
+      'Пожалуйста, укажите корректный URL.\nПример: /seturl https://timetable.tusur.ru/faculties/fsu/groups/425-m',
+      {
+        message_thread_id: message.message_thread_id,
+      }
+    );
     return;
   }
 
-  const success = await updateChatSetting(kv, chatId.toString(), 'timetableUrl', url);
-  
+  const success = await updateChatSetting(
+    kv,
+    chatId.toString(),
+    'timetableUrl',
+    url
+  );
+
   if (success) {
-    await sendMessage(botToken, chatId, `✅ URL расписания обновлен:\n${url}`, {
+    await sendMessage(botToken, chatId, `URL расписания обновлен:\n${url}`, {
       message_thread_id: message.message_thread_id,
     });
   } else {
-    await sendMessage(botToken, chatId, '❌ Ошибка при обновлении URL', {
+    await sendMessage(botToken, chatId, 'Ошибка при обновлении URL', {
       message_thread_id: message.message_thread_id,
     });
   }
@@ -652,38 +772,56 @@ export async function handleSetThreadCommand(message, botToken, kv) {
   const threadId = message.message_thread_id;
 
   const isAdmin = await checkTelegramAdmin(botToken, chatId, userId);
-  
+
   if (!isAdmin) {
-    await sendMessage(botToken, chatId, 'Только администраторы могут изменять настройки.', {
-      message_thread_id: threadId,
-    });
+    await sendMessage(
+      botToken,
+      chatId,
+      'Только администраторы могут изменять настройки.',
+      {
+        message_thread_id: threadId,
+      }
+    );
     return;
   }
 
   if (!threadId) {
-    await sendMessage(botToken, chatId, 'Эта команда должна быть отправлена в теме (топике) чата.', {
-      message_thread_id: threadId,
-    });
+    await sendMessage(
+      botToken,
+      chatId,
+      'Эта команда должна быть отправлена в теме (топике) чата.',
+      {
+        message_thread_id: threadId,
+      }
+    );
     return;
   }
 
   // Получаем текущие настройки
   const settings = await getChatSettings(kv, chatId.toString());
   if (!settings) {
-    await sendMessage(botToken, chatId, 'Настройки не найдены. Используйте /start для инициализации.', {
-      message_thread_id: threadId,
-    });
+    await sendMessage(
+      botToken,
+      chatId,
+      'Настройки не найдены. Используйте /start для инициализации.',
+      {
+        message_thread_id: threadId,
+      }
+    );
     return;
   }
 
   // Получаем название темы из сообщения (если это форум)
-  const threadName = message.reply_to_message?.forum_topic_created?.name || 
-                     message.is_topic_message ? `Тема ${threadId}` : null;
+  const threadName =
+    message.reply_to_message?.forum_topic_created?.name ||
+    message.is_topic_message
+      ? `Тема ${threadId}`
+      : null;
 
   // Обновляем настройки
   settings.threadId = threadId.toString();
   settings.threadName = threadName;
-  
+
   // Добавляем тему в кэш доступных топиков
   if (!settings.forumTopics) {
     settings.forumTopics = {};
@@ -693,14 +831,21 @@ export async function handleSetThreadCommand(message, botToken, kv) {
   }
 
   const success = await saveChatSettings(kv, chatId.toString(), settings);
-  
+
   if (success) {
-    const displayName = threadName ? `${threadName} (ID: ${threadId})` : `ID: ${threadId}`;
-    await sendMessage(botToken, chatId, `✅ Тема для отправки расписания установлена!\n${displayName}`, {
-      message_thread_id: threadId,
-    });
+    const displayName = threadName
+      ? `${threadName} (ID: ${threadId})`
+      : `ID: ${threadId}`;
+    await sendMessage(
+      botToken,
+      chatId,
+      `Тема для отправки расписания установлена!\n${displayName}`,
+      {
+        message_thread_id: threadId,
+      }
+    );
   } else {
-    await sendMessage(botToken, chatId, '❌ Ошибка при установке темы', {
+    await sendMessage(botToken, chatId, 'Ошибка при установке темы', {
       message_thread_id: threadId,
     });
   }
@@ -721,7 +866,7 @@ async function updateForumTopicsCache(message, kv) {
 
     const chatId = message.chat.id.toString();
     const threadId = message.message_thread_id.toString();
-    
+
     // Получаем настройки чата
     const settings = await getChatSettings(kv, chatId);
     if (!settings) {
@@ -730,7 +875,7 @@ async function updateForumTopicsCache(message, kv) {
 
     // Пытаемся получить название темы
     let threadName = null;
-    
+
     // Если это сообщение о создании топика
     if (message.forum_topic_created) {
       threadName = message.forum_topic_created.name;
@@ -794,4 +939,3 @@ export async function handleCommand(update, botToken, kv) {
     console.error('Ошибка при обработке команды:', error);
   }
 }
-
