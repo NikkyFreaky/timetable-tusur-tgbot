@@ -12,6 +12,7 @@ import {
   getChatSettings,
   getUserChats,
   getUserSettings,
+  initializeUserSettings,
   isUserAdmin,
   saveChatSettings,
   saveUserSettings,
@@ -240,6 +241,18 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       // Показываем список факультетов
       try {
         const faculties = await getFacultiesWithCache(kv);
+        
+        if (!faculties || faculties.length === 0) {
+          console.error('Список факультетов пуст или не получен');
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_LOADING_FACULTIES,
+            true
+          );
+          break;
+        }
+
         const facultiesText = MESSAGES.GROUP_SELECTION_STEP1;
 
         await editMessage(botToken, chatId, messageId, facultiesText, {
@@ -773,16 +786,21 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'my_settings':
       // Показываем личные настройки пользователя
       try {
-        const userSettings = await getUserSettings(kv, userId.toString());
+        let userSettings = await getUserSettings(kv, userId.toString());
         
+        // Если настройки не найдены, инициализируем их
         if (!userSettings) {
-          await answerCallbackQuery(
-            botToken,
-            callbackQuery.id,
-            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
-            true
-          );
-          break;
+          userSettings = await initializeUserSettings(kv, userId.toString());
+          
+          if (!userSettings) {
+            await answerCallbackQuery(
+              botToken,
+              callbackQuery.id,
+              MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+              true
+            );
+            break;
+          }
         }
 
         await editMessage(botToken, chatId, messageId, formatUserSettingsText(userSettings), {
@@ -903,6 +921,18 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
       // Изменение группы для личных настроек
       try {
         const faculties = await getFacultiesWithCache(kv);
+        
+        if (!faculties || faculties.length === 0) {
+          console.error('Список факультетов пуст или не получен');
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_LOADING_FACULTIES,
+            true
+          );
+          break;
+        }
+
         const facultiesText = MESSAGES.GROUP_SELECTION_STEP1;
 
         await editMessage(botToken, chatId, messageId, facultiesText, {
