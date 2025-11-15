@@ -240,7 +240,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'change_group':
       // Показываем список факультетов
       try {
+        console.log('Начинаем загрузку факультетов для change_group');
         const faculties = await getFacultiesWithCache(kv);
+        console.log('Факультеты загружены:', faculties ? faculties.length : 'null');
         
         if (!faculties || faculties.length === 0) {
           console.error('Список факультетов пуст или не получен');
@@ -262,6 +264,7 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
         console.error('Ошибка при получении списка факультетов:', error);
+        console.error('Детали ошибки:', error.message, error.stack);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -657,8 +660,23 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'change_time':
       // Показываем выбор часа
       try {
-        const currentHour = settings.sendHour ?? 7;
-        const currentMinute = settings.sendMinute ?? 0;
+        // Загружаем настройки
+        const timeSettings = isUserSettings
+          ? await getUserSettings(kv, actualUserId)
+          : await getChatSettings(kv, targetChatId);
+
+        if (!timeSettings) {
+          await answerCallbackQuery(
+            botToken,
+            callbackQuery.id,
+            MESSAGES.ERROR_SETTINGS_NOT_FOUND,
+            true
+          );
+          break;
+        }
+
+        const currentHour = timeSettings.sendHour ?? 7;
+        const currentMinute = timeSettings.sendMinute ?? 0;
         const timeText =
           MESSAGES.TIME_SELECTION_HEADER +
           `${MESSAGES.TIME_CURRENT} ${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}\n\n` +
@@ -920,7 +938,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'change_user_group':
       // Изменение группы для личных настроек
       try {
+        console.log('Начинаем загрузку факультетов для change_user_group');
         const faculties = await getFacultiesWithCache(kv);
+        console.log('Факультеты загружены:', faculties ? faculties.length : 'null');
         
         if (!faculties || faculties.length === 0) {
           console.error('Список факультетов пуст или не получен');
@@ -941,7 +961,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка факультетов:', error);
+        console.error('Ошибка при получении списка факультетов для пользователя:', error);
+        console.error('Детали ошибки:', error.message, error.stack);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
