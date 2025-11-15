@@ -112,7 +112,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
   const parts = data.split(':');
   const action = parts[0];
-  const targetChatId = parts[1];
+  // Если targetChatId имеет формат "user:userId", объединяем части обратно
+  const targetChatId = parts[1] === 'user' ? `${parts[1]}:${parts[2]}` : parts[1];
 
   // Действия, которые не требуют предварительной проверки прав и настроек
   // (они сами определяют, работают ли с личными настройками или групповыми)
@@ -429,7 +430,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_faculty':
       // Выбор факультета - показываем курсы
       try {
-        const facultySlug = parts[2];
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const facultySlug = parts[1] === 'user' ? parts[3] : parts[2];
         const courses = await getFacultyCoursesWithCache(kv, facultySlug);
 
         if (!courses || Object.keys(courses).length === 0) {
@@ -467,8 +469,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_course':
       // Выбор курса - показываем группы
       try {
-        const courseFacultySlug = parts[2];
-        const courseNumber = parts[3];
+        // Обрабатываем случай когда targetChatId = "user:userId" (5 частей) или обычный chatId (4 части)
+        const courseFacultySlug = parts[1] === 'user' ? parts[3] : parts[2];
+        const courseNumber = parts[1] === 'user' ? parts[4] : parts[3];
         const coursesData = await getFacultyCoursesWithCache(
           kv,
           courseFacultySlug
@@ -522,8 +525,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_group':
       // Выбор группы - сохраняем в настройки
       try {
-        const groupFacultySlug = parts[2];
-        const groupSlug = parts[3];
+        // Обрабатываем случай когда targetChatId = "user:userId" (5 частей) или обычный chatId (4 части)
+        const groupFacultySlug = parts[1] === 'user' ? parts[3] : parts[2];
+        const groupSlug = parts[1] === 'user' ? parts[4] : parts[3];
         const groupUrl = `${BASE_URL}/faculties/${groupFacultySlug}/groups/${groupSlug}`;
 
         // Загружаем настройки
@@ -629,7 +633,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'back_to_courses':
       // Возврат к списку курсов
       try {
-        const backFacultySlug = parts[2];
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const backFacultySlug = parts[1] === 'user' ? parts[3] : parts[2];
         const backCourses = await getFacultyCoursesWithCache(
           kv,
           backFacultySlug
@@ -701,7 +706,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_hour':
       // Выбор часа - показываем выбор минут
       try {
-        const selectedHour = parseInt(parts[2]);
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const selectedHour = parseInt(parts[1] === 'user' ? parts[3] : parts[2]);
         
         // Загружаем настройки
         const hourSettings = isUserSettings
@@ -751,7 +757,8 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'select_minute':
       // Выбор минуты - сохраняем и возвращаемся к настройкам
       try {
-        const selectedMinute = parseInt(parts[2]);
+        // Обрабатываем случай когда targetChatId = "user:userId" (4 части) или обычный chatId (3 части)
+        const selectedMinute = parseInt(parts[1] === 'user' ? parts[3] : parts[2]);
         
         // Загружаем настройки
         const minuteSettings = isUserSettings
