@@ -10,17 +10,37 @@
  */
 export function parseTimetable(html, date = new Date()) {
   // Получаем информацию о текущей неделе
+  // Ищем элемент с классами current и current-week (в любом порядке)
   const weekMatch = html.match(
-    /class=['"]tile[^'"]*current[^'"]*current-week['"][^>]*>([\s\S]*?)<\/li>/
+    /<li[^>]*class=['"][^'"]*current[^'"]*current-week[^'"]*['"][^>]*>([\s\S]*?)<\/li>/i
+  ) || html.match(
+    /<li[^>]*class=['"][^'"]*current-week[^'"]*current[^'"]*['"][^>]*>([\s\S]*?)<\/li>/i
   );
+  
   let weekType = 'неизвестно';
 
   if (weekMatch) {
     const weekText = weekMatch[1];
-    if (weekText.includes('чётная')) {
+    console.log(`[DEBUG] Найден текст недели: ${weekText.substring(0, 100)}`);
+    if (weekText.includes('чётная') || weekText.includes('четная')) {
       weekType = 'чётная';
-    } else if (weekText.includes('нечётная')) {
+    } else if (weekText.includes('нечётная') || weekText.includes('нечетная')) {
       weekType = 'нечётная';
+    }
+  } else {
+    console.log('[DEBUG] Элемент с текущей неделей не найден, пробуем альтернативный метод');
+    // Альтернативный метод: ищем любой элемент с current-week
+    const altWeekMatch = html.match(
+      /<li[^>]*current-week[^>]*>([\s\S]*?)<\/li>/i
+    );
+    if (altWeekMatch) {
+      const weekText = altWeekMatch[1];
+      console.log(`[DEBUG] Найден текст недели (альтернативный метод): ${weekText.substring(0, 100)}`);
+      if (weekText.includes('чётная') || weekText.includes('четная')) {
+        weekType = 'чётная';
+      } else if (weekText.includes('нечётная') || weekText.includes('нечетная')) {
+        weekType = 'нечётная';
+      }
     }
   }
 
