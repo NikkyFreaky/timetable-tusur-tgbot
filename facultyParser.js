@@ -5,6 +5,30 @@
 const BASE_URL = 'https://timetable.tusur.ru';
 
 /**
+ * Декодирует HTML-сущности в строке
+ * @param {string} text - Текст с HTML-сущностями
+ * @returns {string} Декодированный текст
+ */
+function decodeHtmlEntities(text) {
+  const entities = {
+    '&quot;': '"',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&nbsp;': ' ',
+    '&#39;': "'",
+    '&laquo;': '«',
+    '&raquo;': '»',
+    '&mdash;': '—',
+    '&ndash;': '–',
+  };
+
+  return text.replace(/&[a-z]+;|&#\d+;/gi, (match) => {
+    return entities[match] || match;
+  });
+}
+
+/**
  * Получает список факультетов
  * @returns {Promise<Array<{name: string, url: string, slug: string}>>} Список факультетов
  */
@@ -48,7 +72,7 @@ function parseFaculties(html) {
   
   while ((match = linkPattern.exec(listHtml)) !== null) {
     const slug = match[1];
-    const name = match[2].trim();
+    const name = decodeHtmlEntities(match[2].trim());
     
     faculties.push({
       name: name,
@@ -127,7 +151,7 @@ function parseGroups(html, facultySlug) {
   
   while ((match = groupPattern.exec(html)) !== null) {
     const groupSlug = match[1];
-    const groupName = match[2].trim();
+    const groupName = decodeHtmlEntities(match[2].trim());
     
     groups.push({
       name: groupName,
