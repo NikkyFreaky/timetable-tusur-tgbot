@@ -241,7 +241,6 @@ export async function fetchTimetable(url) {
     }
     return await response.text();
   } catch (error) {
-    console.error('Ошибка при получении расписания:', error);
     throw error;
   }
 }

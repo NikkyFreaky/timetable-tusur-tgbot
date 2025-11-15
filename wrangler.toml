@@ -3,23 +3,8 @@ main = "src/worker.js"
 compatibility_date = "2025-11-14"
 
 kv_namespaces = [
-  { binding = "SETTINGS_KV", id = "047f76ccf83b42528f0695fb1295f5f0" }
+  { binding = "timetable-tgbot-kv", id = "047f76ccf83b42528f0695fb1295f5f0" }
 ]
 
 [triggers]
 crons = ["0,30 * * * *"]
-
-[observability]
-enabled = false
-head_sampling_rate = 1
-
-[observability.logs]
-enabled = true
-head_sampling_rate = 1
-persist = true
-invocation_logs = true
-
-[observability.traces]
-enabled = false
-persist = true
-head_sampling_rate = 1

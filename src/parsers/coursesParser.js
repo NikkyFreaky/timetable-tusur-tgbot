@@ -20,10 +20,6 @@ export async function getFacultyCourses(facultySlug) {
     const html = await response.text();
     return parseFacultyCourses(html, facultySlug);
   } catch (error) {
-    console.error(
-      `Ошибка при получении курсов факультета ${facultySlug}:`,
-      error
-    );
     throw error;
   }
 }

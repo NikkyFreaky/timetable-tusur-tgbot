@@ -49,7 +49,6 @@ export async function getChatSettings(kv, chatId) {
     const settings = await kv.get(key, 'json');
     return settings;
   } catch (error) {
-    console.error(`Ошибка при получении настроек чата ${chatId}:`, error);
     return null;
   }
 }
@@ -77,7 +76,6 @@ export async function saveChatSettings(kv, chatId, settings) {
     await kv.put(key, JSON.stringify(settingsWithTimestamp));
     return true;
   } catch (error) {
-    console.error(`Ошибка при сохранении настроек чата ${chatId}:`, error);
     return false;
   }
 }
@@ -94,7 +92,6 @@ export async function deleteChatSettings(kv, chatId) {
     await kv.delete(key);
     return true;
   } catch (error) {
-    console.error(`Ошибка при удалении настроек чата ${chatId}:`, error);
     return false;
   }
 }
@@ -122,10 +119,6 @@ export async function getUserChats(kv, userId) {
 
     return chats;
   } catch (error) {
-    console.error(
-      `Ошибка при получении списка чатов пользователя ${userId}:`,
-      error
-    );
     return [];
   }
 }
@@ -149,7 +142,6 @@ export async function getAllActiveChats(kv) {
 
     return chats;
   } catch (error) {
-    console.error('Ошибка при получении списка активных чатов:', error);
     return [];
   }
 }
@@ -172,10 +164,6 @@ export async function updateChatSetting(kv, chatId, field, value) {
     settings[field] = value;
     return await saveChatSettings(kv, chatId, settings);
   } catch (error) {
-    console.error(
-      `Ошибка при обновлении поля ${field} чата ${chatId}:`,
-      error
-    );
     return false;
   }
 }
@@ -198,10 +186,6 @@ export async function isUserAdmin(kv, chatId, userId) {
       settings.createdBy === userId || settings.adminIds?.includes(userId)
     );
   } catch (error) {
-    console.error(
-      `Ошибка при проверке прав администратора для пользователя ${userId} в чате ${chatId}:`,
-      error
-    );
     return false;
   }
 }
@@ -238,7 +222,6 @@ export async function initializeChatSettings(
     const success = await saveChatSettings(kv, chatId, defaultSettings);
     return success ? defaultSettings : null;
   } catch (error) {
-    console.error(`Ошибка при инициализации настроек чата ${chatId}:`, error);
     return null;
   }
 }
@@ -255,7 +238,6 @@ export async function getUserSettings(kv, userId) {
     const settings = await kv.get(key, 'json');
     return settings;
   } catch (error) {
-    console.error(`Ошибка при получении настроек пользователя ${userId}:`, error);
     return null;
   }
 }
@@ -283,7 +265,6 @@ export async function saveUserSettings(kv, userId, settings) {
     await kv.put(key, JSON.stringify(settingsWithTimestamp));
     return true;
   } catch (error) {
-    console.error(`Ошибка при сохранении настроек пользователя ${userId}:`, error);
     return false;
   }
 }
@@ -313,7 +294,6 @@ export async function initializeUserSettings(kv, userId, initialSettings = {}) {
     const success = await saveUserSettings(kv, userId, defaultSettings);
     return success ? defaultSettings : null;
   } catch (error) {
-    console.error(`Ошибка при инициализации настроек пользователя ${userId}:`, error);
     return null;
   }
 }
@@ -337,7 +317,6 @@ export async function getAllActiveUsers(kv) {
 
     return users;
   } catch (error) {
-    console.error('Ошибка при получении списка активных пользователей:', error);
     return [];
   }
 }

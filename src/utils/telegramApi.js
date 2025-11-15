@@ -143,7 +143,6 @@ export async function checkTelegramAdmin(botToken, chatId, userId) {
     const status = data.result.status;
     return TELEGRAM_ADMIN_STATUSES.includes(status);
   } catch (error) {
-    console.error('Ошибка при проверке прав администратора:', error);
     return false;
   }
 }
@@ -176,7 +175,6 @@ export async function getChatInfo(botToken, chatId) {
 
     return data.result;
   } catch (error) {
-    console.error('Ошибка при получении информации о чате:', error);
     return null;
   }
 }
@@ -201,7 +199,6 @@ export async function getForumTopics(botToken, chatId) {
     // Топики нужно кэшировать при получении сообщений
     return [];
   } catch (error) {
-    console.error('Ошибка при получении списка тем:', error);
     return [];
   }
 }

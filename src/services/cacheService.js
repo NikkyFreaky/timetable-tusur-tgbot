@@ -19,7 +19,7 @@ export async function cacheFaculties(kv, faculties, ttl = CACHE_TTL.FACULTIES) {
       expirationTtl: ttl,
     });
   } catch (error) {
-    console.error('Ошибка при кэшировании факультетов:', error);
+    // Игнорируем ошибки кэширования
   }
 }
 
@@ -33,7 +33,6 @@ export async function getCachedFaculties(kv) {
     const cached = await kv.get(KV_KEYS.FACULTIES_CACHE, 'json');
     return cached;
   } catch (error) {
-    console.error('Ошибка при получении факультетов из кэша:', error);
     return null;
   }
 }
@@ -61,10 +60,7 @@ export async function cacheFacultyCourses(
       }
     );
   } catch (error) {
-    console.error(
-      `Ошибка при кэшировании курсов факультета ${facultySlug}:`,
-      error
-    );
+    // Игнорируем ошибки кэширования
   }
 }
 
@@ -82,10 +78,6 @@ export async function getCachedFacultyCourses(kv, facultySlug) {
     );
     return cached;
   } catch (error) {
-    console.error(
-      `Ошибка при получении курсов факультета ${facultySlug} из кэша:`,
-      error
-    );
     return null;
   }
 }

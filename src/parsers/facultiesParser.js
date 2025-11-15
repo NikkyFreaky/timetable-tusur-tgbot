@@ -19,7 +19,6 @@ export async function getFaculties() {
     const html = await response.text();
     return parseFaculties(html);
   } catch (error) {
-    console.error('Ошибка при получении списка факультетов:', error);
     throw error;
   }
 }
@@ -39,7 +38,6 @@ function parseFaculties(html) {
   );
 
   if (!listMatch) {
-    console.error('Не удалось найти список факультетов');
     return faculties;
   }
 

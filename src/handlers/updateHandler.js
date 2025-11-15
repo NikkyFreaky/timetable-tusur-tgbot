@@ -66,16 +66,14 @@ async function updateForumTopicsCache(message, kv) {
     if (threadName && threadName !== settings.forumTopics[threadId]) {
       settings.forumTopics[threadId] = threadName;
       await saveChatSettings(kv, chatId, settings);
-      console.log(`Обновлено название темы ${threadId}: ${threadName}`);
     }
     // Если название не получили, но темы еще нет в кэше, добавляем с ID
     else if (!settings.forumTopics[threadId]) {
       settings.forumTopics[threadId] = `${MESSAGES.TOPIC_PREFIX} ${threadId}`;
       await saveChatSettings(kv, chatId, settings);
-      console.log(`Добавлена тема с ID: ${threadId}`);
     }
   } catch (error) {
-    console.error('Ошибка при обновлении кэша топиков:', error);
+    // Игнорируем ошибки при обновлении кэша топиков
   }
 }
 
@@ -113,7 +111,7 @@ export async function handleUpdate(update, botToken, kv) {
       await handleCallbackQuery(update.callback_query, botToken, kv);
     }
   } catch (error) {
-    console.error('Ошибка при обработке команды:', error);
+    // Игнорируем ошибки обработки
   }
 }
 

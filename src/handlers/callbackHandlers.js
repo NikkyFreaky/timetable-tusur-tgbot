@@ -241,12 +241,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'change_group':
       // Показываем список факультетов
       try {
-        console.log('Начинаем загрузку факультетов для change_group');
         const faculties = await getFacultiesWithCache(kv);
-        console.log('Факультеты загружены:', faculties ? faculties.length : 'null');
         
         if (!faculties || faculties.length === 0) {
-          console.error('Список факультетов пуст или не получен');
           await answerCallbackQuery(
             botToken,
             callbackQuery.id,
@@ -264,8 +261,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка факультетов:', error);
-        console.error('Детали ошибки:', error.message, error.stack);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -310,7 +305,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при открытии настроек чата:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -377,7 +371,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате к настройкам:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -408,7 +401,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате к списку чатов:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -456,7 +448,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка курсов:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -512,7 +503,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка групп:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -595,7 +585,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
           `${MESSAGES.GROUP_SELECTED} ${groupSlug.toUpperCase()} ${MESSAGES.GROUP_SELECTED_SUFFIX}`
         );
       } catch (error) {
-        console.error('Ошибка при сохранении группы:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -620,7 +609,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате к факультетам:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -652,7 +640,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате к курсам:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -693,7 +680,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при открытии выбора времени:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -744,7 +730,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при выборе часа:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -798,7 +783,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
           `${MESSAGES.TIME_SET_SUCCESS} ${timeStr}`
         );
       } catch (error) {
-        console.error('Ошибка при выборе минуты:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -834,7 +818,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при открытии личных настроек:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -873,7 +856,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при загрузке списка чатов:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -894,7 +876,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при возврате в главное меню:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -932,7 +913,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
           userSettings.enabled ? MESSAGES.STATUS_BOT_ENABLED : MESSAGES.STATUS_BOT_DISABLED
         );
       } catch (error) {
-        console.error('Ошибка при переключении статуса:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -945,12 +925,9 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
     case 'change_user_group':
       // Изменение группы для личных настроек
       try {
-        console.log('Начинаем загрузку факультетов для change_user_group');
         const faculties = await getFacultiesWithCache(kv);
-        console.log('Факультеты загружены:', faculties ? faculties.length : 'null');
         
         if (!faculties || faculties.length === 0) {
-          console.error('Список факультетов пуст или не получен');
           await answerCallbackQuery(
             botToken,
             callbackQuery.id,
@@ -968,8 +945,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при получении списка факультетов для пользователя:', error);
-        console.error('Детали ошибки:', error.message, error.stack);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,
@@ -1007,7 +982,6 @@ export async function handleCallbackQuery(callbackQuery, botToken, kv) {
 
         await answerCallbackQuery(botToken, callbackQuery.id);
       } catch (error) {
-        console.error('Ошибка при открытии выбора времени:', error);
         await answerCallbackQuery(
           botToken,
           callbackQuery.id,

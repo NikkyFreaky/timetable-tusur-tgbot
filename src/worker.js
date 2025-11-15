@@ -49,7 +49,7 @@ async function sendTimetableToChat(botToken, chatSettings, date = new Date()) {
         errorMessage
       );
     } catch (sendError) {
-      console.error('Не удалось отправить сообщение об ошибке');
+      // Игнорируем ошибки отправки сообщения об ошибке
     }
 
     return {
@@ -90,7 +90,7 @@ async function sendTimetableToUser(botToken, userSettings, date = new Date()) {
       const errorMessage = formatErrorMessage();
       await sendMessage(botToken, userSettings.userId, errorMessage);
     } catch (sendError) {
-      console.error('Не удалось отправить сообщение об ошибке');
+      // Игнорируем ошибки отправки сообщения об ошибке
     }
 
     return {
