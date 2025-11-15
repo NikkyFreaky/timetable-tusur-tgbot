@@ -7,13 +7,16 @@
  * Структура настроек чата:
  * {
  *   chatId: string,
+ *   chatName: string, // Название чата
  *   threadId: string,
+ *   threadName: string, // Название темы
  *   timetableUrl: string,
  *   enabled: boolean,
  *   adminIds: string[], // ID администраторов, которые могут управлять ботом
  *   createdBy: string, // ID пользователя, который добавил бота
  *   createdAt: string,
- *   updatedAt: string
+ *   updatedAt: string,
+ *   forumTopics: Object // Кэш доступных топиков форума {threadId: threadName}
  * }
  */
 

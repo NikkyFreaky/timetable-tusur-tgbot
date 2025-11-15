@@ -84,6 +84,83 @@ export async function sendTimetableToThread(
 }
 
 /**
+ * Получает информацию о чате
+ * @param {string} botToken - Токен бота
+ * @param {string} chatId - ID чата
+ * @returns {Promise<Object|null>} Информация о чате или null
+ */
+export async function getChatInfo(botToken, chatId) {
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/getChat`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        chat_id: chatId,
+      }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    if (!data.ok) {
+      return null;
+    }
+
+    return data.result;
+  } catch (error) {
+    console.error('Ошибка при получении информации о чате:', error);
+    return null;
+  }
+}
+
+/**
+ * Получает список тем (форум топиков) в чате
+ * @param {string} botToken - Токен бота
+ * @param {string} chatId - ID чата
+ * @returns {Promise<Array>} Список тем или пустой массив
+ */
+export async function getForumTopics(botToken, chatId) {
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/getForumTopicIconStickers`;
+    
+    // Сначала проверим, является ли чат форумом
+    const chatInfo = await getChatInfo(botToken, chatId);
+    if (!chatInfo || !chatInfo.is_forum) {
+      return [];
+    }
+
+    // Получаем список топиков через метод getForumTopicIconStickers не работает
+    // Используем альтернативный подход - сохраняем топики при получении сообщений
+    return [];
+  } catch (error) {
+    console.error('Ошибка при получении списка тем:', error);
+    return [];
+  }
+}
+
+/**
+ * Получает информацию о теме форума
+ * @param {string} botToken - Токен бота
+ * @param {string} chatId - ID чата
+ * @param {string} threadId - ID темы
+ * @returns {Promise<Object|null>} Информация о теме или null
+ */
+export async function getForumTopicInfo(botToken, chatId, threadId) {
+  try {
+    // К сожалению, Telegram Bot API не предоставляет прямого метода для получения информации о топике
+    // Информацию можно получить только из сообщений в этом топике
+    // Возвращаем null, информация будет сохраняться при получении сообщений
+    return null;
+  } catch (error) {
+    console.error('Ошибка при получении информации о теме:', error);
+    return null;
+  }
+}
+
+/**
  * Валидирует конфигурацию бота
  * @param {Object} env - Объект с переменными окружения
  * @throws {Error} Если конфигурация невалидна
