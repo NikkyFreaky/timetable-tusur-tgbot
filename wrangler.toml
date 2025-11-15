@@ -8,3 +8,10 @@ kv_namespaces = [
 
 [triggers]
 crons = ["0,30 * * * *"]
+
+[observability]
+[observability.logs]
+enabled = false
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
