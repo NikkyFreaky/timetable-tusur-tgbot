@@ -143,6 +143,32 @@ export type Database = {
           settings?: Record<string, unknown> | null
         }
       }
+      cache: {
+        Row: {
+          key: string
+          value: Record<string, unknown>
+          type: string
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: Record<string, unknown>
+          type: string
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          key?: string
+          value?: Record<string, unknown>
+          type?: string
+          expires_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }
