@@ -1,0 +1,110 @@
+export interface ResourceLink {
+  label: string
+  url: string
+}
+
+export interface Lesson {
+  id: string
+  time: string
+  timeEnd: string
+  subject: string
+  type:
+    | "lecture"
+    | "practice"
+    | "lab"
+    | "coursework"
+    | "courseProject"
+    | "credit"
+    | "creditWithGrade"
+    | "exam"
+    | "selfStudy"
+    | "consultation"
+  room: string
+  roomLinks?: ResourceLink[]
+  instructor: string
+  instructorLinks?: ResourceLink[]
+  weekType?: "even" | "odd" | "all"
+  date?: string
+  jointGroups?: string[]
+  groupLinks?: ResourceLink[]
+  jointGroupLinks?: ResourceLink[]
+  resourceLinks?: ResourceLink[]
+  notes?: string[]
+}
+
+export interface DaySchedule {
+  dayName: string
+  dayIndex: number
+  lessons: Lesson[]
+}
+
+export interface WeekSchedule {
+  weekNumber: number
+  weekType: "even" | "odd"
+  days: DaySchedule[]
+}
+
+export interface Faculty {
+  id: string
+  name: string
+  shortName: string
+}
+
+export interface Group {
+  id: string
+  name: string
+  facultyId: string
+  course: number
+}
+
+export interface UserSettings {
+  facultySlug: string | null
+  facultyName: string | null
+  groupSlug: string | null
+  groupName: string | null
+  course: number | null
+  weekType: "even" | "odd"
+  notificationsEnabled: boolean
+  notificationTime: string
+  sendDayBefore: boolean
+  sendDayOf: boolean
+  notifyNoLessons: boolean
+  notifyHolidays: boolean
+  notifyVacations: boolean
+  notifyWeekStart: boolean
+  notifyHolidayDay: boolean
+  theme: "light" | "dark" | "system"
+}
+
+export interface SpecialPeriod {
+  id: string
+  type: "holiday" | "exam" | "vacation" | "weekend"
+  name: string
+  startDate: string
+  endDate: string
+}
+
+export const LESSON_TYPES: Record<Lesson["type"], { label: string; color: string }> = {
+  lecture: { label: "Лекция", color: "#E5FFD5" },
+  practice: { label: "Практическое занятие", color: "#D5F6FF" },
+  lab: { label: "Лабораторная работа", color: "#D7D7F4" },
+  coursework: { label: "Курсовая работа", color: "#FFD5E5" },
+  courseProject: { label: "Курсовое проектирование", color: "#FFD5E5" },
+  credit: { label: "Зачет", color: "#F7DC6F" },
+  creditWithGrade: { label: "Зачет с оценкой", color: "#F8C471" },
+  exam: { label: "Экзамен", color: "#F1948A" },
+  selfStudy: { label: "Самостоятельная работа", color: "#FFFFFF" },
+  consultation: { label: "Консультация", color: "#FFFFFF" },
+}
+
+export const DAY_NAMES = [
+  "Понедельник",
+  "Вторник",
+  "Среда",
+  "Четверг",
+  "Пятница",
+  "Суббота",
+  "Воскресенье",
+]
+
+export const DAY_NAMES_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
