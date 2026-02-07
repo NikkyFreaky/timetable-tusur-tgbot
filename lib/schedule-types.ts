@@ -86,15 +86,15 @@ export interface SpecialPeriod {
 
 export const LESSON_TYPES: Record<Lesson["type"], { label: string; color: string }> = {
   lecture: { label: "Лекция", color: "#E5FFD5" },
-  practice: { label: "Практическое занятие", color: "#D5F6FF" },
-  lab: { label: "Лабораторная работа", color: "#D7D7F4" },
-  coursework: { label: "Курсовая работа", color: "#FFD5E5" },
-  courseProject: { label: "Курсовое проектирование", color: "#FFD5E5" },
+  practice: { label: "Практика", color: "#D5F6FF" },
+  lab: { label: "Лаба", color: "#D7D7F4" },
+  coursework: { label: "Курсовая", color: "#FFD5E5" },
+  courseProject: { label: "Курс. пр.", color: "#FFD5E5" },
   credit: { label: "Зачет", color: "#F7DC6F" },
-  creditWithGrade: { label: "Зачет с оценкой", color: "#F8C471" },
+  creditWithGrade: { label: "Зач. с оц.", color: "#F8C471" },
   exam: { label: "Экзамен", color: "#F1948A" },
-  selfStudy: { label: "Самостоятельная работа", color: "#FFFFFF" },
-  consultation: { label: "Консультация", color: "#FFFFFF" },
+  selfStudy: { label: "СРС", color: "#FFFFFF" },
+  consultation: { label: "Конс.", color: "#FFFFFF" },
 }
 
 export const DAY_NAMES = [
