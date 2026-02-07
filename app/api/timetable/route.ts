@@ -8,13 +8,6 @@ type SchedulePayload = {
   weekStart: string
 }
 
-type CacheEntry = {
-  value: SchedulePayload
-  expiresAt: number
-}
-
-const CACHE_TTL_MS = 10 * 60 * 1000
-const scheduleCache = new Map<string, CacheEntry>()
 const inflightRequests = new Map<string, Promise<SchedulePayload>>()
 
 function parseDateParam(value: string | null): Date | null {
@@ -45,18 +38,6 @@ function formatDateParam(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-function getCacheKey(faculty: string, group: string, weekStart: string): string {
-  return `${faculty}|${group}|${weekStart}`
-}
-
-function cleanupCache(now: number) {
-  for (const [key, entry] of scheduleCache.entries()) {
-    if (entry.expiresAt + CACHE_TTL_MS < now) {
-      scheduleCache.delete(key)
-    }
-  }
-}
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -75,44 +56,17 @@ export async function GET(request: Request) {
 
     const monday = getMondayOfWeek(parsedWeekStart)
     const weekStart = formatDateParam(monday)
-    const cacheKey = getCacheKey(faculty, group, weekStart)
-    const now = Date.now()
+    const cacheKey = `${faculty}|${group}|${weekStart}`
 
-    cleanupCache(now)
-
-    const cachedEntry = scheduleCache.get(cacheKey)
-    if (cachedEntry && cachedEntry.expiresAt > now) {
-      return NextResponse.json(cachedEntry.value, {
+    const inflight = inflightRequests.get(cacheKey)
+    if (inflight) {
+      const payload = await inflight
+      return NextResponse.json(payload, {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=600, stale-while-revalidate=600",
-          "X-Cache": "HIT",
+          "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=3600",
+          "X-Cache": "SHARED",
         },
       })
-    }
-
-    const staleValue = cachedEntry?.value ?? null
-    const inflight = inflightRequests.get(cacheKey)
-
-    if (inflight) {
-      try {
-        const payload = await inflight
-        return NextResponse.json(payload, {
-          headers: {
-            "Cache-Control": "public, max-age=0, s-maxage=600, stale-while-revalidate=600",
-            "X-Cache": "SHARED",
-          },
-        })
-      } catch (error) {
-        if (staleValue) {
-          return NextResponse.json(staleValue, {
-            headers: {
-              "Cache-Control": "public, max-age=0, s-maxage=60",
-              "X-Cache": "STALE",
-            },
-          })
-        }
-        throw error
-      }
     }
 
     const fetchPromise = (async (): Promise<SchedulePayload> => {
@@ -128,27 +82,12 @@ export async function GET(request: Request) {
 
     try {
       const payload = await fetchPromise
-      scheduleCache.set(cacheKey, {
-        value: payload,
-        expiresAt: Date.now() + CACHE_TTL_MS,
-      })
-
       return NextResponse.json(payload, {
         headers: {
-          "Cache-Control": "public, max-age=0, s-maxage=600, stale-while-revalidate=600",
-          "X-Cache": staleValue ? "REFRESH" : "MISS",
+          "Cache-Control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=3600",
+          "X-Cache": "MISS",
         },
       })
-    } catch (error) {
-      if (staleValue) {
-        return NextResponse.json(staleValue, {
-          headers: {
-            "Cache-Control": "public, max-age=0, s-maxage=60",
-            "X-Cache": "STALE",
-          },
-        })
-      }
-      throw error
     } finally {
       if (inflightRequests.get(cacheKey) === fetchPromise) {
         inflightRequests.delete(cacheKey)
