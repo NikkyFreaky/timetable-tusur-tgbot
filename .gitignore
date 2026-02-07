@@ -26,7 +26,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# data backups
-data/users.json
-data/users.json.backup
-data/chats.json
+# IDE
+.idea/

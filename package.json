@@ -6,9 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start",
-    "migrate:supabase": "tsx scripts/migrate-to-supabase.ts",
-    "schema:apply": "tsx scripts/apply-schema.ts"
+    "start": "next start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
