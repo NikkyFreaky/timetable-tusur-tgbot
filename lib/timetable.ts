@@ -2,13 +2,14 @@ import type { DaySchedule, Lesson, ResourceLink } from "@/lib/schedule-types"
 import { DAY_NAMES } from "@/lib/schedule-types"
 import type { CourseOption, FacultyOption, GroupOption } from "@/lib/timetable-types"
 import { getWeekType } from "@/lib/schedule-data"
+import { CACHE_TTL, CACHE_TYPE } from "@/lib/cache-config"
+import { get, getWithStale, set } from "@/lib/cache-store"
 
 const BASE_URL = "https://timetable.tusur.ru"
 const TUSUR_BASE_URL = "https://tusur.ru"
 const FACULTY_PHOTOS_URL =
   "https://tusur.ru/ru/o-tusure/struktura-i-organy-upravleniya/departament-obrazovaniya/fakultety-i-kafedry"
-const FACULTIES_CACHE_TTL_MS = 90 * 24 * 60 * 60 * 1000
-let facultyCache: { value: FacultyOption[]; expiresAt: number } | null = null
+const FACULTIES_CACHE_KEY = "faculties"
 let facultiesInFlight: Promise<FacultyOption[]> | null = null
 const BASE_WEEK_ID = 786
 
@@ -151,12 +152,27 @@ function parseLessonModals(html: string): Map<string, LessonModalInfo> {
 }
 
 async function fetchResourceLinks(url: string): Promise<ResourceLink[]> {
+  const cacheKey = `resources:${url}`
+
+  const cached = await get<ResourceLink[]>(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const staleData = await getWithStale<ResourceLink[]>(cacheKey)
+
   try {
     const response = await fetch(url, { cache: "no-store" })
-    if (!response.ok) return []
+    if (!response.ok) {
+      if (staleData) return staleData.value
+      return []
+    }
 
     const data = await response.json()
-    if (!Array.isArray(data)) return []
+    if (!Array.isArray(data)) {
+      if (staleData) return staleData.value
+      return []
+    }
 
     const deduped = new Map<string, ResourceLink>()
     for (const item of data) {
@@ -177,8 +193,13 @@ async function fetchResourceLinks(url: string): Promise<ResourceLink[]> {
       }
     }
 
-    return Array.from(deduped.values())
-  } catch {
+    const links = Array.from(deduped.values())
+    await set(cacheKey, links, CACHE_TTL.RESOURCES, CACHE_TYPE.RESOURCES)
+    return links
+  } catch (error) {
+    if (staleData) {
+      return staleData.value
+    }
     return []
   }
 }
@@ -442,14 +463,35 @@ function parseFacultyLogoUrls(css: string): Record<string, string> {
 }
 
 async function fetchFacultyLogos(html: string): Promise<Record<string, string>> {
-  const cssUrl = extractStylesheetUrl(html)
-  if (!cssUrl) return {}
+  const cacheKey = "logos"
 
-  const response = await fetch(cssUrl, { cache: "no-store" })
-  if (!response.ok) return {}
+  const cached = await get<Record<string, string>>(cacheKey)
+  if (cached) {
+    return cached
+  }
 
-  const css = await response.text()
-  return parseFacultyLogoUrls(css)
+  const staleData = await getWithStale<Record<string, string>>(cacheKey)
+
+  try {
+    const cssUrl = extractStylesheetUrl(html)
+    if (!cssUrl) return {}
+
+    const response = await fetch(cssUrl, { cache: "no-store" })
+    if (!response.ok) {
+      if (staleData) return staleData.value
+      return {}
+    }
+
+    const css = await response.text()
+    const logos = parseFacultyLogoUrls(css)
+    await set(cacheKey, logos, CACHE_TTL.LOGOS, CACHE_TYPE.LOGOS)
+    return logos
+  } catch (error) {
+    if (staleData) {
+      return staleData.value
+    }
+    return {}
+  }
 }
 
 function parseFacultyPhotos(html: string): Record<string, string> {
@@ -473,10 +515,32 @@ function parseFacultyPhotos(html: string): Record<string, string> {
 }
 
 async function fetchFacultyPhotos(): Promise<Record<string, string>> {
-  const response = await fetch(FACULTY_PHOTOS_URL, { cache: "no-store" })
-  if (!response.ok) return {}
-  const html = await response.text()
-  return parseFacultyPhotos(html)
+  const cacheKey = "photos"
+
+  const cached = await get<Record<string, string>>(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const staleData = await getWithStale<Record<string, string>>(cacheKey)
+
+  try {
+    const response = await fetch(FACULTY_PHOTOS_URL, { cache: "no-store" })
+    if (!response.ok) {
+      if (staleData) return staleData.value
+      return {}
+    }
+
+    const html = await response.text()
+    const photos = parseFacultyPhotos(html)
+    await set(cacheKey, photos, CACHE_TTL.PHOTOS, CACHE_TYPE.PHOTOS)
+    return photos
+  } catch (error) {
+    if (staleData) {
+      return staleData.value
+    }
+    return {}
+  }
 }
 
 function parseFaculties(
@@ -539,16 +603,16 @@ function parseFacultyCourses(html: string): CourseOption[] {
 }
 
 export async function fetchFaculties(): Promise<FacultyOption[]> {
-  const now = Date.now()
-  if (facultyCache && facultyCache.expiresAt > now) {
-    return facultyCache.value
+  const cached = await get<FacultyOption[]>(FACULTIES_CACHE_KEY)
+  if (cached) {
+    return cached
   }
 
   if (facultiesInFlight) {
     return facultiesInFlight
   }
 
-  const staleValue = facultyCache?.value ?? null
+  const staleData = await getWithStale<FacultyOption[]>(FACULTIES_CACHE_KEY)
 
   const fetchPromise = (async () => {
     const response = await fetch(`${BASE_URL}/faculties`, { cache: "no-store" })
@@ -560,21 +624,19 @@ export async function fetchFaculties(): Promise<FacultyOption[]> {
       fetchFacultyLogos(html).catch(() => ({})),
       fetchFacultyPhotos().catch(() => ({})),
     ])
-    return parseFaculties(html, logos, photos)
+    const faculties = parseFaculties(html, logos, photos)
+    await set(FACULTIES_CACHE_KEY, faculties, CACHE_TTL.FACULTIES, CACHE_TYPE.FACULTIES)
+    return faculties
   })()
 
   facultiesInFlight = fetchPromise
 
   try {
     const faculties = await fetchPromise
-    facultyCache = {
-      value: faculties,
-      expiresAt: Date.now() + FACULTIES_CACHE_TTL_MS,
-    }
     return faculties
   } catch (error) {
-    if (staleValue) {
-      return staleValue
+    if (staleData) {
+      return staleData.value
     }
     throw error
   } finally {
@@ -585,12 +647,30 @@ export async function fetchFaculties(): Promise<FacultyOption[]> {
 }
 
 export async function fetchFacultyCourses(facultySlug: string): Promise<CourseOption[]> {
-  const response = await fetch(`${BASE_URL}/faculties/${facultySlug}`, { cache: "no-store" })
-  if (!response.ok) {
-    throw new Error(`Failed to fetch courses (${response.status})`)
+  const cacheKey = `courses:${facultySlug}`
+
+  const cached = await get<CourseOption[]>(cacheKey)
+  if (cached) {
+    return cached
   }
-  const html = await response.text()
-  return parseFacultyCourses(html)
+
+  const staleData = await getWithStale<CourseOption[]>(cacheKey)
+
+  try {
+    const response = await fetch(`${BASE_URL}/faculties/${facultySlug}`, { cache: "no-store" })
+    if (!response.ok) {
+      throw new Error(`Failed to fetch courses (${response.status})`)
+    }
+    const html = await response.text()
+    const courses = parseFacultyCourses(html)
+    await set(cacheKey, courses, CACHE_TTL.COURSES, CACHE_TYPE.COURSES)
+    return courses
+  } catch (error) {
+    if (staleData) {
+      return staleData.value
+    }
+    throw error
+  }
 }
 
 export async function fetchWeekSchedule(
@@ -598,10 +678,27 @@ export async function fetchWeekSchedule(
   groupSlug: string,
   weekStart: Date
 ): Promise<{ weekType: "even" | "odd"; days: DaySchedule[] }> {
-  const url = buildTimetableUrl(facultySlug, groupSlug)
-  const html = await fetchTimetableHtml(url, weekStart)
-  const lessonModals = parseLessonModals(html)
-  const schedule = parseWeekSchedule(html, weekStart, lessonModals)
-  await hydrateLessonResourceLinks(schedule.days, lessonModals)
-  return schedule
+  const cacheKey = `schedule:${facultySlug}:${groupSlug}:${weekStart.toISOString().split('T')[0]}`
+
+  const cached = await get<{ weekType: "even" | "odd"; days: DaySchedule[] }>(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const staleData = await getWithStale<{ weekType: "even" | "odd"; days: DaySchedule[] }>(cacheKey)
+
+  try {
+    const url = buildTimetableUrl(facultySlug, groupSlug)
+    const html = await fetchTimetableHtml(url, weekStart)
+    const lessonModals = parseLessonModals(html)
+    const schedule = parseWeekSchedule(html, weekStart, lessonModals)
+    await hydrateLessonResourceLinks(schedule.days, lessonModals)
+    await set(cacheKey, schedule, CACHE_TTL.SCHEDULE, CACHE_TYPE.SCHEDULE)
+    return schedule
+  } catch (error) {
+    if (staleData) {
+      return staleData.value
+    }
+    throw error
+  }
 }
