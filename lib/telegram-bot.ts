@@ -1,7 +1,12 @@
 type SendMessageOptions = {
   parseMode?: "HTML" | "MarkdownV2"
   disableWebPagePreview?: boolean
-  replyMarkup?: Record<string, unknown>
+  replyMarkup?: {
+    inline_keyboard: Array<Array<{
+      text: string
+      web_app?: { url: string }
+    }>>
+  }
   messageThreadId?: number
 }
 
@@ -28,6 +33,8 @@ export async function sendTelegramMessage(
   if (options.replyMarkup) body.reply_markup = options.replyMarkup
   if (options.messageThreadId) body.message_thread_id = options.messageThreadId
 
+  console.log('[Telegram sendMessage] Request body:', JSON.stringify(body, null, 2))
+
   const response = await fetch(`${TELEGRAM_API}${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -35,10 +42,18 @@ export async function sendTelegramMessage(
   })
 
   const data = (await response.json().catch(() => ({}))) as TelegramResponse
+
   if (!response.ok || !data.ok) {
+    console.error('[Telegram sendMessage] Error:', {
+      status: response.status,
+      data: data,
+      body: body
+    })
     const description = data.description || `HTTP ${response.status}`
     throw new Error(`Telegram sendMessage failed: ${description}`)
   }
+
+  console.log('[Telegram sendMessage] Success')
 }
 
 export function buildWebAppKeyboard(url: string) {
