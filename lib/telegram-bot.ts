@@ -4,6 +4,7 @@ type SendMessageOptions = {
   replyMarkup?: {
     inline_keyboard: Array<Array<{
       text: string
+      url?: string
       web_app?: { url: string }
     }>>
   }
@@ -58,6 +59,10 @@ export async function sendTelegramMessage(
 
 export function buildWebAppKeyboard(url: string) {
   return {
-    inline_keyboard: [[{ text: "Открыть расписание", web_app: { url } }]],
+    inline_keyboard: [[{
+      text: "Открыть расписание",
+      url: url
+    }]],
   }
 }
+
