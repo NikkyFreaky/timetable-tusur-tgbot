@@ -105,6 +105,9 @@ export function ScheduleApp() {
   const [apiWeekType, setApiWeekType] = useState<"even" | "odd" | null>(null)
   const [activeTab, setActiveTab] = useState<"schedule" | "groups">("schedule")
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
+  
+  const isPrivateChat = chat?.type === "private"
+  const isGroupChat = chat?.type === "group" || chat?.type === "supergroup"
 
   // Derived state - week type is calculated from selected monday
   const computedWeekType = useMemo(() => getWeekType(selectedMonday), [selectedMonday])
@@ -274,51 +277,55 @@ export function ScheduleApp() {
           </div>
         )}
 
-        {/* Week Navigation */}
-        <div className="px-4 pb-3">
-          <WeekToggle
-            weekType={weekType}
-            monday={selectedMonday}
-            isCurrentWeek={isCurrentWeek}
-            onPrevWeek={handlePrevWeek}
-            onNextWeek={handleNextWeek}
-            onGoToToday={handleGoToToday}
-          />
-        </div>
+        {/* Week Navigation - only show in private chats */}
+        {!isGroupChat && (
+          <div className="px-4 pb-3">
+            <WeekToggle
+              weekType={weekType}
+              monday={selectedMonday}
+              isCurrentWeek={isCurrentWeek}
+              onPrevWeek={handlePrevWeek}
+              onNextWeek={handleNextWeek}
+              onGoToToday={handleGoToToday}
+            />
+          </div>
+        )}
 
-        {/* View Mode Toggle */}
-        <div className="flex border-t border-border">
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback("selection")
-              setViewMode("day")
-            }}
-            className={cn(
-              "flex-1 py-2.5 text-sm font-medium transition-colors",
-              viewMode === "day"
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted-foreground"
-            )}
-          >
-            По дням
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback("selection")
-              setViewMode("upcoming")
-            }}
-            className={cn(
-              "flex-1 py-2.5 text-sm font-medium transition-colors",
-              viewMode === "upcoming"
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted-foreground"
-            )}
-          >
-            Ближайшие
-          </button>
-        </div>
+        {/* View Mode Toggle - only show in private chats */}
+        {!isGroupChat && (
+          <div className="flex border-t border-border">
+            <button
+              type="button"
+              onClick={() => {
+                hapticFeedback("selection")
+                setViewMode("day")
+              }}
+              className={cn(
+                "flex-1 py-2.5 text-sm font-medium transition-colors",
+                viewMode === "day"
+                  ? "text-primary border-b-2 border-primary"
+                  : "text-muted-foreground"
+              )}
+            >
+              По дням
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                hapticFeedback("selection")
+                setViewMode("upcoming")
+              }}
+              className={cn(
+                "flex-1 py-2.5 text-sm font-medium transition-colors",
+                viewMode === "upcoming"
+                  ? "text-primary border-b-2 border-primary"
+                  : "text-muted-foreground"
+              )}
+            >
+              Ближайшие
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
