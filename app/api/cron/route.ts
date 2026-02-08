@@ -35,6 +35,7 @@ type Recipient = {
   label: string | null
   settings: UserSettings
   state: NotificationState
+  topicId: number | null
 }
 
 type ScheduleCache = Map<string, Promise<{ weekType: "even" | "odd"; days: DaySchedule[] }>>
@@ -223,6 +224,7 @@ export async function GET(request: Request) {
       label: user.settings.groupName ?? null,
       settings: user.settings,
       state: user.notificationState ?? {},
+      topicId: null,
     })
   }
   for (const chat of chats) {
@@ -233,6 +235,7 @@ export async function GET(request: Request) {
       label: chat.settings.groupName ?? chat.title,
       settings: chat.settings,
       state: chat.notificationState ?? {},
+      topicId: chat.topicId ?? null,
     })
   }
 
@@ -382,6 +385,7 @@ export async function GET(request: Request) {
       for (const message of messages) {
         await sendTelegramMessage(botToken, recipient.id, message, {
           disableWebPagePreview: true,
+          messageThreadId: recipient.topicId ?? undefined,
         })
         sentCount += 1
       }
