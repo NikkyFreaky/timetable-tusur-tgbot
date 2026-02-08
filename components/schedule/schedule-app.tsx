@@ -85,6 +85,10 @@ const formatTime = (date: Date): string => {
 export function ScheduleApp() {
   const { hapticFeedback, isReady, chat, user } = useTelegram()
   const { settings, updateSettings, resetSettings } = useSettings()
+  
+  const isPrivateChat = chat?.type === "private"
+  const isGroupChat = chat?.type === "group" || chat?.type === "supergroup"
+  
   const scopeLabel =
     chat?.type && chat.type !== "private"
       ? `Настройки чата: ${chat.title || "без названия"}`
@@ -244,7 +248,9 @@ export function ScheduleApp() {
             type="button"
             onClick={() => {
               hapticFeedback("light")
-              if (activeTab === "groups") {
+              if (isGroupChat) {
+                setGroupSettingsOpen(true)
+              } else if (activeTab === "groups") {
                 setGroupSettingsOpen(true)
               } else {
                 setSettingsOpen(true)
@@ -257,7 +263,7 @@ export function ScheduleApp() {
         </div>
 
         {/* Tabs - only show in private chats */}
-        {chat?.type === "private" && (
+        {!isGroupChat && (
           <div className="px-4 pb-3">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schedule" | "groups")}>
               <TabsList className="w-full">
@@ -273,6 +279,9 @@ export function ScheduleApp() {
             </Tabs>
           </div>
         )}
+
+        {/* Week Navigation - only show in private chats */}
+        {!isGroupChat && (
 
         {/* Week Navigation */}
         <div className="px-4 pb-3">
@@ -321,159 +330,197 @@ export function ScheduleApp() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        {viewMode === "day" ? (
-          <>
-            {/* Day Selector with Dates */}
-            <DaySelector
-              selectedDay={selectedDay}
-              onSelect={setSelectedDay}
-              currentDay={currentDayIndex}
-              hasLessons={hasLessons}
-              weekDates={weekDates}
-              isCurrentWeek={isCurrentWeek}
-            />
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          {isPrivateChat && (
+            <>
+              {/* Schedule view for private chats */}
+              {viewMode === "day" ? (
+                <>
+                  {/* Day Selector with Dates */}
+                  <DaySelector
+                    selectedDay={selectedDay}
+                    onSelect={setSelectedDay}
+                    currentDay={currentDayIndex}
+                    hasLessons={hasLessons}
+                    weekDates={weekDates}
+                    isCurrentWeek={isCurrentWeek}
+                  />
 
-            {scheduleError ? (
-              <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
-            ) : isScheduleLoading ? (
-              <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
-            ) : null}
+                  {scheduleError ? (
+                    <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
+                  ) : isScheduleLoading ? (
+                    <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
+                  ) : null}
 
-            {/* Day Header */}
-            <div className="px-4 py-3 border-b border-border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-foreground">{DAY_NAMES[selectedDay]}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDayDate(selectedDate)}
-                    {isToday && " • Сегодня"}
-                  </p>
-                </div>
-                {specialPeriod && (
-                  <span className={cn(
-                    "text-xs px-2 py-1 rounded-full border border-transparent",
-                    isNewYearHoliday &&
-                      "border-amber-200/70 bg-gradient-to-r from-amber-200/70 via-rose-200/60 to-sky-200/70 text-amber-700",
-                    !isNewYearHoliday &&
-                      specialPeriod.type === "holiday" &&
-                      "bg-red-500/10 text-red-600 dark:text-red-400",
-                    specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                    specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
-                  )}>
-                    {isNewYearHoliday && "Новогодние"}
-                    {specialPeriod.type === "holiday" && !isNewYearHoliday && "Выходной"}
-                    {specialPeriod.type === "exam" && "Сессия"}
-                    {specialPeriod.type === "vacation" && "Каникулы"}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Schedule */}
-            <DayView
-              schedule={selectedDaySchedule}
-              specialPeriod={specialPeriod}
-              currentTime={currentTime}
-              isToday={isToday}
-            />
-          </>
-        ) : (
-          <>
-            {/* Today's Date */}
-            <div className="px-4 py-4 border-b border-border">
-              <p className="text-sm text-muted-foreground capitalize">{formatDate(today)}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {weekType === "even" ? "Чётная" : "Нечётная"} неделя
-              </p>
-            </div>
-
-            {scheduleError ? (
-              <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
-            ) : isScheduleLoading ? (
-              <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
-            ) : null}
-
-            {/* Special Period Notice */}
-            {specialPeriod && (
-              <div className={cn(
-                "mx-4 mt-4 p-3 rounded-xl text-sm border border-transparent",
-                isNewYearHoliday &&
-                  "border-amber-200/70 bg-gradient-to-br from-amber-100/70 via-rose-100/60 to-sky-100/70 text-amber-700",
-                !isNewYearHoliday &&
-                  specialPeriod.type === "holiday" &&
-                  "bg-red-500/10 text-red-600 dark:text-red-400",
-                specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
-              )}>
-                <div className="flex items-start gap-2">
-                  {isNewYearHoliday && <Sparkles className="h-4 w-4 mt-0.5" />}
-                  <div>
-                    <strong>{specialPeriod.name}</strong>
-                    <span
-                      className={cn(
-                        "ml-2",
-                        isNewYearHoliday ? "text-amber-700/80" : "text-muted-foreground"
+                  {/* Day Header */}
+                  <div className="px-4 py-3 border-b border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="font-semibold text-foreground">{DAY_NAMES[selectedDay]}</h2>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDayDate(selectedDate)}
+                          {isToday && " • Сегодня"}
+                        </p>
+                      </div>
+                      {specialPeriod && (
+                        <span className={cn(
+                          "text-xs px-2 py-1 rounded-full border border-transparent",
+                          isNewYearHoliday &&
+                            "border-amber-200/70 bg-gradient-to-r from-amber-200/70 via-rose-200/60 to-sky-200/70 text-amber-700",
+                          !isNewYearHoliday &&
+                            specialPeriod.type === "holiday" &&
+                            "bg-red-500/10 text-red-600 dark:text-red-400",
+                          specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                          specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
+                        )}>
+                          {isNewYearHoliday && "Новогодние"}
+                          {specialPeriod.type === "holiday" && !isNewYearHoliday && "Выходной"}
+                          {specialPeriod.type === "exam" && "Сессия"}
+                          {specialPeriod.type === "vacation" && "Каникулы"}
+                        </span>
                       )}
-                    >
-                      {specialPeriod.type === "holiday" && "• Выходной"}
-                      {specialPeriod.type === "exam" && "• Сессия"}
-                      {specialPeriod.type === "vacation" && "• Каникулы"}
-                    </span>
+                    </div>
                   </div>
-                </div>
+
+                  {/* Schedule */}
+                  <DayView
+                    schedule={selectedDaySchedule}
+                    specialPeriod={specialPeriod}
+                    currentTime={currentTime}
+                    isToday={isToday}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Today's Date */}
+                  <div className="px-4 py-4 border-b border-border">
+                    <p className="text-sm text-muted-foreground capitalize">{formatDate(today)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {weekType === "even" ? "Чётная" : "Нечётная"} неделя
+                    </p>
+                  </div>
+
+                  {scheduleError ? (
+                    <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
+                  ) : isScheduleLoading ? (
+                    <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
+                  ) : null}
+
+                  {/* Special Period Notice */}
+                  {specialPeriod && (
+                    <div className={cn(
+                      "mx-4 mt-4 p-3 rounded-xl text-sm border border-transparent",
+                      isNewYearHoliday &&
+                        "border-amber-200/70 bg-gradient-to-br from-amber-100/70 via-rose-100/60 to-sky-100/70 text-amber-700",
+                      !isNewYearHoliday &&
+                        specialPeriod.type === "holiday" &&
+                        "bg-red-500/10 text-red-600 dark:text-red-400",
+                      specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                      specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
+                    )}>
+                      <div className="flex items-start gap-2">
+                        {isNewYearHoliday && <Sparkles className="h-4 w-4 mt-0.5" />}
+                        <div>
+                          <strong>{specialPeriod.name}</strong>
+                          <span
+                            className={cn(
+                              "ml-2",
+                              isNewYearHoliday ? "text-amber-700/80" : "text-muted-foreground"
+                            )}
+                          >
+                            {specialPeriod.type === "holiday" && "• Выходной"}
+                            {specialPeriod.type === "exam" && "• Сессия"}
+                            {specialPeriod.type === "vacation" && "• Каникулы"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upcoming Classes */}
+                  <UpcomingClasses
+                    schedule={schedule}
+                    currentDayIndex={currentDayIndex}
+                    weekDates={weekDates}
+                    isCurrentWeek={isCurrentWeek}
+                    currentTime={currentTime}
+                    onViewDay={handleViewDay}
+                  />
+                </>
+              )}
+            </>
+          )}
+
+          {isGroupChat && (
+            <div className="px-4 py-6">
+              <div className="bg-card rounded-xl border border-border p-6 text-center">
+                <p className="text-sm text-foreground mb-2">
+                  Настройки чата для "{chat.title || "без названия"}"
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Функционал в разработке. Откройте веб-приложение из личного чата с ботом для настройки уведомлений группы.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setGroupSettingsOpen(true)}
+                  className="mt-4 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium"
+                >
+                  Открыть настройки
+                </button>
               </div>
-            )}
+            </div>
+          )}
+        </main>
 
-            {/* Upcoming Classes */}
-            <UpcomingClasses
-              schedule={schedule}
-              currentDayIndex={currentDayIndex}
-              weekDates={weekDates}
-              isCurrentWeek={isCurrentWeek}
-              currentTime={currentTime}
-              onViewDay={handleViewDay}
-            />
-          </>
-        )}
-      </main>
+       {/* No Group Selected Notice */}
+       {isGroupChat && (
+         <div className="sticky bottom-0 bg-primary/10 border-t border-primary/20 p-4">
+           <p className="text-sm text-muted-foreground">
+             Настройки доступны через личные сообщения бота. Нажмите, чтобы перейти.
+           </p>
+         </div>
+       )}
 
-      {/* No Group Selected Notice */}
-      {!settings.groupSlug && (
-        <div className="sticky bottom-0 bg-primary/10 border-t border-primary/20 p-4">
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback("light")
-              setSettingsOpen(true)
-            }}
-            className="w-full text-center"
-          >
-            <p className="text-sm font-medium text-primary">Выберите группу в настройках</p>
-            <p className="text-xs text-primary/70 mt-0.5">Нажмите, чтобы открыть настройки</p>
-          </button>
-        </div>
-      )}
+       {/* Settings Panel */}
+       <SettingsPanel
+         open={settingsOpen}
+         onOpenChange={setSettingsOpen}
+         settings={settings}
+         onUpdateSettings={updateSettings}
+         onResetSettings={resetSettings}
+         scopeLabel={scopeLabel}
+       />
 
-      {/* Settings Panel */}
-      <SettingsPanel
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        settings={settings}
-        onUpdateSettings={updateSettings}
-        onResetSettings={resetSettings}
-        scopeLabel={scopeLabel}
-      />
+       {/* Group Settings Panel */}
+       {isGroupChat && (
+         <div className="fixed inset-0 bg-background z-50 flex flex-col">
+           <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
+             <div className="px-4 py-4 space-y-1">
+               <h1 className="text-lg font-semibold text-foreground">
+                 Настройки чата: {chat.title || "без названия"}
+               </h1>
+              <p className="text-xs text-muted-foreground">
+                {chat?.type === "group" ? "Групповой чат" : "Форум-чат"}
+              </p>
+             </div>
+           </header>
 
-      {/* Group Settings Panel */}
-      {user?.id && (
-        <GroupSettingsPanel
-          userId={user.id}
-          isOpen={groupSettingsOpen}
-          onOpenChange={setGroupSettingsOpen}
-        />
-      )}
+           <main className="flex-1 overflow-y-auto pb-20">
+             <div className="px-4 py-6 text-center">
+               <p className="text-sm text-muted-foreground mb-4">
+                 Настройки доступны через личные сообщения бота.
+               </p>
+               <p className="text-sm text-muted-foreground">
+                 Откройте бота в личных сообщениях и перейдите в раздел "Группы".
+               </p>
+               <p className="text-xs text-muted-foreground">
+                 Функция в разработке 🚧
+               </p>
+             </div>
+           </main>
+         </div>
+       )}
     </div>
   )
 }

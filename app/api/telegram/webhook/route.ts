@@ -130,9 +130,9 @@ export async function POST(request: Request) {
             isForum,
           })
 
-          await sendTelegramMessage(botToken, chatId, "Откройте веб-приложение, чтобы настроить расписание.", {
-            replyMarkup: buildWebAppKeyboard(webAppUrl),
-          })
+          await sendTelegramMessage(botToken, chatId, 
+            "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
+          )
         } else {
           const memberInfo = await getChatMember(botToken, chatId, member.id)
           if (memberInfo) {
@@ -178,9 +178,9 @@ export async function POST(request: Request) {
               isForum,
             })
 
-            await sendTelegramMessage(botToken, chat.id, "Откройте веб-приложение, чтобы настроить расписание.", {
-              replyMarkup: buildWebAppKeyboard(webAppUrl),
-            })
+            await sendTelegramMessage(botToken, chat.id, 
+              "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
+            )
           }
         }
       }
