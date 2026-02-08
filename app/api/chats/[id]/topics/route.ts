@@ -38,37 +38,24 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
+    const mainTopic = {
+      id: null as any,
+      chatId,
+      name: "Основной чат",
+      iconColor: null,
+      iconCustomEmojiId: null,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+    }
+
     if (!chat.isForum) {
-      return NextResponse.json({
-        topics: [
-          {
-            id: null,
-            chatId,
-            name: "Основной чат",
-            iconColor: null,
-            iconCustomEmojiId: null,
-            createdAt: chat.createdAt,
-            updatedAt: chat.updatedAt,
-          },
-        ],
-      })
+      return NextResponse.json({ topics: [mainTopic] })
     }
 
     const topics = await listChatTopics(chatId)
 
     return NextResponse.json({
-      topics: [
-        {
-          id: null,
-          chatId,
-          name: "Основной чат",
-          iconColor: null,
-          iconCustomEmojiId: null,
-          createdAt: chat.createdAt,
-          updatedAt: chat.updatedAt,
-        },
-        ...topics,
-      ],
+      topics: [mainTopic, ...topics],
     })
   } catch (error) {
     console.error("Failed to load chat topics:", error)
