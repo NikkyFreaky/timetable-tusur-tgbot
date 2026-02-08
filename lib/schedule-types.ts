@@ -108,3 +108,21 @@ export const DAY_NAMES = [
 ]
 
 export const DAY_NAMES_SHORT = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+
+export interface ChatMember {
+  chatId: number
+  userId: number
+  role: "creator" | "administrator" | "member" | "left" | "kicked"
+  addedAt: string
+  updatedAt: string
+}
+
+export interface ChatTopic {
+  id: number
+  chatId: number
+  name: string
+  iconColor: number | null
+  iconCustomEmojiId: number | null
+  createdAt: string
+  updatedAt: string
+}
