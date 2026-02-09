@@ -111,6 +111,12 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       setColorScheme(tg.colorScheme || "light")
       setIsReady(true)
 
+      console.log("Telegram WebApp initialized:", {
+        initDataUnsafe: tg.initDataUnsafe,
+        user: tg.initDataUnsafe?.user,
+        chat: tg.initDataUnsafe?.chat,
+      })
+
       // Apply Telegram theme
       if (tg.themeParams.bg_color) {
         document.documentElement.style.setProperty("--tg-bg-color", tg.themeParams.bg_color)
@@ -133,6 +139,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       if (prefersDark) {
         document.documentElement.classList.add("dark")
       }
+
+      console.log("Telegram WebApp not found, using fallback mode")
     }
   }, [])
 

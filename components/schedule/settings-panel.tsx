@@ -290,7 +290,10 @@ export function SettingsPanel({
   }, [])
 
   useEffect(() => {
-    if (!open || activeTab !== "groups" || !userId) return
+    if (!open || activeTab !== "groups" || !userId) {
+      console.log("Skipping chat load:", { open, activeTab, userId })
+      return
+    }
 
     let cancelled = false
     setIsLoadingChats(true)
@@ -863,19 +866,25 @@ export function SettingsPanel({
             </div>
           </TabsContent>
 
-          <TabsContent value="groups">
+              <TabsContent value="groups">
                 <div className="py-4">
-                  {isLoadingChats && (
+                  {!userId && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Групповые настройки доступны только через Telegram Mini App.
+                      Откройте приложение через бота @timetable_tusur_bot.
+                    </div>
+                  )}
+                  {userId && isLoadingChats && (
                     <div className="px-4 py-8 text-center text-muted-foreground">
                       Загрузка групп...
                     </div>
                   )}
-                  {!isLoadingChats && chatsError && (
+                  {userId && !isLoadingChats && chatsError && (
                     <div className="px-4 py-8 text-center text-destructive">
                       {chatsError}
                     </div>
                   )}
-                  {!isLoadingChats && !chatsError && chats.length === 0 && (
+                  {userId && !isLoadingChats && !chatsError && chats.length === 0 && (
                     <div className="px-4 py-8 text-center text-muted-foreground">
                       Нет групп
                     </div>

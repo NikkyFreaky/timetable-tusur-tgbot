@@ -83,6 +83,9 @@ const formatTime = (date: Date): string => {
 export function ScheduleApp() {
   const { hapticFeedback, isReady, chat, user } = useTelegram()
   const { settings, updateSettings, resetSettings } = useSettings()
+
+  console.log("ScheduleApp rendered:", { user, chat, isReady })
+
   const scopeLabel =
     chat?.type && chat.type !== "private"
       ? `Настройки чата: ${chat.title || "без названия"}`
