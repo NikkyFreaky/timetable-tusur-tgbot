@@ -1522,6 +1522,274 @@ export function SettingsPanel({
               )}
             </div>
           )}
+
+          {/* Personal sub-views */}
+          {view !== "main" && (
+            <div className="py-4">
+              {view === "faculty" && (
+                <div className="py-2">
+                  {isLoadingFaculties && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Загрузка факультетов...
+                    </div>
+                  )}
+                  {!isLoadingFaculties && facultiesError && (
+                    <div className="px-4 py-8 text-center text-destructive">
+                      {facultiesError}
+                    </div>
+                  )}
+                  {!isLoadingFaculties && !facultiesError && faculties.length === 0 && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Нет доступных факультетов
+                    </div>
+                  )}
+                  {!isLoadingFaculties && !facultiesError && faculties.length > 0 && (
+                    faculties.map((faculty) => (
+                      <button
+                        key={faculty.slug}
+                        type="button"
+                        onClick={() => handleSelectFaculty(faculty.slug)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-3.5 active:bg-accent/50 transition-colors",
+                          faculty.slug === tempFacultySlug && "bg-primary/5"
+                        )}
+                      >
+                        <div className="flex items-center gap-3 text-left">
+                          <div className="h-11 w-11 rounded-2xl border border-border/60 bg-muted/30 flex items-center justify-center overflow-hidden">
+                            {faculty.imageUrl ? (
+                              <img
+                                src={faculty.imageUrl}
+                                alt={`${faculty.name} логотип`}
+                                className="h-8 w-8 object-contain"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span className="text-xs font-semibold text-muted-foreground">
+                                {faculty.name.slice(0, 2).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div className="font-medium text-foreground">{faculty.name}</div>
+                        </div>
+                        {faculty.slug === tempFacultySlug && (
+                          <Check className="h-5 w-5 text-primary" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {view === "course" && (
+                <div className="py-2">
+                  {!tempFacultySlug && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Сначала выберите факультет
+                    </div>
+                  )}
+                  {tempFacultySlug && isLoadingCourses && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Загрузка курсов...
+                    </div>
+                  )}
+                  {tempFacultySlug && !isLoadingCourses && coursesError && (
+                    <div className="px-4 py-8 text-center text-destructive">
+                      {coursesError}
+                    </div>
+                  )}
+                  {tempFacultySlug && !isLoadingCourses && availableCourses.length > 0 ? (
+                    availableCourses.map((course) => (
+                      <button
+                        key={course.number}
+                        type="button"
+                        onClick={() => handleSelectCourse(course.number)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-3.5 active:bg-accent/50 transition-colors",
+                          course.number === tempCourse && "bg-primary/5"
+                        )}
+                      >
+                        <span className="font-medium text-foreground">{course.number} курс</span>
+                        {course.number === tempCourse && (
+                          <Check className="h-5 w-5 text-primary" />
+                        )}
+                      </button>
+                    ))
+                  ) : tempFacultySlug && !isLoadingCourses && !coursesError ? (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Нет доступных курсов для выбранного факультета
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {view === "group" && (
+                <div className="py-2">
+                  {!tempCourse && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Сначала выберите курс
+                    </div>
+                  )}
+                  {tempCourse && isLoadingCourses && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Загрузка групп...
+                    </div>
+                  )}
+                  {tempCourse && !isLoadingCourses && coursesError && (
+                    <div className="px-4 py-8 text-center text-destructive">
+                      {coursesError}
+                    </div>
+                  )}
+                  {tempCourse && !isLoadingCourses && availableGroups.length > 0 ? (
+                    availableGroups.map((group) => (
+                      <button
+                        key={group.slug}
+                        type="button"
+                        onClick={() => handleSelectGroup(group)}
+                        className={cn(
+                          "w-full flex items-center justify-between px-4 py-3.5 active:bg-accent/50 transition-colors",
+                          group.slug === settings.groupSlug && "bg-primary/5"
+                        )}
+                      >
+                        <span className="font-medium text-foreground">Группа {group.name}</span>
+                        {group.slug === settings.groupSlug && (
+                          <Check className="h-5 w-5 text-primary" />
+                        )}
+                      </button>
+                    ))
+                  ) : tempCourse && !isLoadingCourses && !coursesError ? (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Нет доступных групп для выбранного курса
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {view === "time" && (
+                <div className="py-4 px-4 space-y-6">
+                  <div className="text-center">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      Время уведомления
+                    </div>
+                    <div className="text-4xl font-semibold text-foreground tracking-[0.08em]">
+                      {settings.notificationTime}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center rounded-3xl border border-border/60 bg-card/70 p-4 shadow-sm backdrop-blur">
+                    <div className="relative">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                        Час
+                      </div>
+                      <div
+                        className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/60 shadow-inner backdrop-blur-sm"
+                        style={{ height: WHEEL_CONTAINER_HEIGHT }}
+                      >
+                        <div
+                          ref={hourScrollRef}
+                          onScroll={() => {
+                            if (hourScrollTimeout.current) {
+                              clearTimeout(hourScrollTimeout.current)
+                            }
+                            hourScrollTimeout.current = setTimeout(() => {
+                              const element = hourScrollRef.current
+                              if (!element) return
+                              const index = Math.round(element.scrollTop / WHEEL_ITEM_HEIGHT)
+                              const clampedIndex = Math.min(23, Math.max(0, index))
+                              if (clampedIndex !== latestTimeParts.current.hour) {
+                                hapticFeedback("selection")
+                                onUpdateSettings({
+                                  notificationTime: buildNotificationTime(clampedIndex, latestTimeParts.current.minute),
+                                })
+                              }
+                              snapWheelScroll(element, clampedIndex, 23)
+                            }, 120)
+                          }}
+                          className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-none"
+                          style={{ paddingBlock: WHEEL_ITEM_HEIGHT * 2 }}
+                        >
+                           {hours.map((hour) => (
+                            <button
+                              key={hour}
+                              type="button"
+                              onClick={() => handleSelectHour(hour)}
+                              className={cn(
+                                "h-11 w-full flex items-center justify-center text-lg font-semibold snap-center transition-colors",
+                                hour === timeParts.hour
+                                  ? "text-foreground text-2xl"
+                                  : "text-muted-foreground/60"
+                              )}
+                            >
+                              {String(hour).padStart(2, "0")}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-background/90 to-transparent" />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/90 to-transparent" />
+                        <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 h-11 rounded-xl bg-foreground/5" />
+                        <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 h-11 border-t border-b border-foreground/20" />
+                      </div>
+                    </div>
+                    <div className="text-4xl font-semibold text-muted-foreground/70">:</div>
+                    <div className="relative">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                        Минуты
+                      </div>
+                      <div
+                        className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/60 shadow-inner backdrop-blur-sm"
+                        style={{ height: WHEEL_CONTAINER_HEIGHT }}
+                      >
+                        <div
+                          ref={minuteScrollRef}
+                          onScroll={() => {
+                            if (minuteScrollTimeout.current) {
+                              clearTimeout(minuteScrollTimeout.current)
+                            }
+                            minuteScrollTimeout.current = setTimeout(() => {
+                              const element = minuteScrollRef.current
+                              if (!element) return
+                              const index = Math.round(element.scrollTop / WHEEL_ITEM_HEIGHT)
+                              const clampedIndex = Math.min(59, Math.max(0, index))
+                              if (clampedIndex !== latestTimeParts.current.minute) {
+                                hapticFeedback("selection")
+                                onUpdateSettings({
+                                  notificationTime: buildNotificationTime(latestTimeParts.current.hour, clampedIndex),
+                                })
+                              }
+                              snapWheelScroll(element, clampedIndex, 59)
+                            }, 120)
+                          }}
+                          className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-none"
+                          style={{ paddingBlock: WHEEL_ITEM_HEIGHT * 2 }}
+                        >
+                          {minutes.map((minute) => (
+                            <button
+                              key={minute}
+                              type="button"
+                              onClick={() => handleSelectMinute(minute)}
+                              className={cn(
+                                "h-11 w-full flex items-center justify-center text-lg font-semibold snap-center transition-colors",
+                                minute === timeParts.minute
+                                  ? "text-foreground text-2xl"
+                                  : "text-muted-foreground/60"
+                              )}
+                            >
+                              {String(minute).padStart(2, "0")}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-background/90 to-transparent" />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/90 to-transparent" />
+                        <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 h-11 rounded-xl bg-foreground/5" />
+                        <div className="pointer-events-none absolute inset-x-3 top-1/2 -translate-y-1/2 h-11 border-t border-b border-foreground/20" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground text-center">
+                    Прокрутите, чтобы выбрать время, как в будильнике.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { buildWebAppKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
-import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus } from "@/lib/telegram-api"
+import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getForumTopics } from "@/lib/telegram-api"
 import { upsertChat, createOrUpdateChatMember, upsertChatTopic, deleteChatTopic, getChatById } from "@/lib/chat-store"
 
 export const runtime = "nodejs"
@@ -212,7 +212,7 @@ export async function POST(request: Request) {
 
     if (update.chat_member) {
       const { chat, new_chat_member, old_chat_member } = update.chat_member
-      console.log("=== chat_member event ===", { chatId: chat.id, "user:", new_chat_member.user.id, "status:", new_chat_member.status, "oldStatus:", old_chat_member?.status })
+      console.log("=== chat_member event ===", { chatId: chat.id, userId: new_chat_member.user.id, status: new_chat_member.status, oldStatus: old_chat_member?.status })
 
       const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
       console.log("Member info from Telegram:", memberInfo)
@@ -229,25 +229,21 @@ export async function POST(request: Request) {
           const topics = await getForumTopics(botToken, chat.id)
           console.log("Topics from Telegram API:", topics)
 
-          for (const topic of topics) {
-            console.log("Upserting topic:", topic)
-            await upsertChatTopic({
-              id: topic.id,
-              chatId: chat.id,
-              name: topic.name,
-              iconColor: topic.icon_color,
-              iconCustomEmojiId: topic.icon_custom_emoji_id ? Number(topic.icon_custom_emoji_id) : undefined,
-            })
+          if (topics) {
+            for (const topic of topics) {
+              console.log("Upserting topic:", topic)
+              await upsertChatTopic({
+                id: topic.id,
+                chatId: chat.id,
+                name: topic.name,
+                iconColor: topic.icon_color,
+                iconCustomEmojiId: 'icon_custom_emoji_id' in topic && topic.icon_custom_emoji_id ? Number(topic.icon_custom_emoji_id) : undefined,
+              })
+            }
           }
 
           console.log("Topics synced to database")
         }
-      }
-    }
-        }
-
-        await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
-        console.log("Chat member created/updated")
       }
     }
 
