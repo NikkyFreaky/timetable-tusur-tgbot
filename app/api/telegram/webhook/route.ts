@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { buildWebAppKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
 import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getForumTopics } from "@/lib/telegram-api"
-import { upsertChat, createOrUpdateChatMember, upsertChatTopic, deleteChatTopic, getChatById } from "@/lib/chat-store"
+import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById } from "@/lib/chat-store"
 
 export const runtime = "nodejs"
 
@@ -10,7 +10,21 @@ type TelegramUpdate = {
   message?: {
     message_id: number
     chat: { id: number; type: string; title?: string; username?: string; photo_url?: string }
+    message_thread_id?: number
     text?: string
+    forum_topic_created?: {
+      name: string
+      icon_color: number
+      icon_custom_emoji_id?: string
+    }
+    forum_topic_edited?: {
+      name?: string
+      icon_custom_emoji_id?: string
+    }
+    forum_topic_closed?: Record<string, never>
+    forum_topic_reopened?: Record<string, never>
+    general_forum_topic_hidden?: Record<string, never>
+    general_forum_topic_unhidden?: Record<string, never>
     from?: {
       id: number
       is_bot?: boolean
@@ -59,29 +73,6 @@ type TelegramUpdate = {
       user: { id: number; is_bot: boolean; first_name: string; last_name?: string; username?: string }
     }
   }
-  forum_topic_created?: {
-    name: string
-    icon_color: number
-    icon_custom_emoji_id?: string
-    thread_id: number
-  }
-  forum_topic_edited?: {
-    name?: string
-    icon_custom_emoji_id?: string
-    thread_id: number
-  }
-  forum_topic_closed?: {
-    thread_id: number
-  }
-  forum_topic_reopened?: {
-    thread_id: number
-  }
-  general_forum_topic_hidden?: {
-    thread_id: number
-  }
-  general_forum_topic_unhidden?: {
-    thread_id: number
-  }
 }
 
 function getCommand(text: string | undefined) {
@@ -103,23 +94,20 @@ export async function POST(request: Request) {
     const update = (await request.json()) as TelegramUpdate
     const message = update.message ?? update.edited_message
 
-    if (!message?.chat?.id) {
-      return NextResponse.json({ ok: true })
-    }
+    if (message?.chat?.id) {
+      const chatId = message.chat.id
+      const isGroup = message.chat.type !== "private"
 
-    const chatId = message.chat.id
-    const isGroup = message.chat.type !== "private"
+      const command = getCommand(message.text)
 
-    const command = getCommand(message.text)
+      if (command === "/start" || command === "/settings") {
+        const text = "Откройте веб-приложение, чтобы выбрать группу и настроить уведомления."
+        await sendTelegramMessage(botToken, chatId, text, {
+          replyMarkup: buildWebAppKeyboard(webAppUrl),
+        })
+      }
 
-    if (command === "/start" || command === "/settings") {
-      const text = "Откройте веб-приложение, чтобы выбрать группу и настроить уведомления."
-      await sendTelegramMessage(botToken, chatId, text, {
-        replyMarkup: buildWebAppKeyboard(webAppUrl),
-      })
-    }
-
-    if (isGroup && message.new_chat_members) {
+      if (isGroup && message.new_chat_members) {
       console.log("new_chat_members event in chat:", chatId, message.new_chat_members)
       for (const member of message.new_chat_members) {
         if (member.is_bot) {
@@ -157,17 +145,18 @@ export async function POST(request: Request) {
           }
         }
       }
-    }
-
-    if (isGroup && message.left_chat_member) {
-      const storedChat = await getChatById(chatId)
-      if (storedChat && storedChat.createdBy === message.left_chat_member.id) {
-        const { updateChatsNotificationState } = await import("@/lib/chat-store")
-        await updateChatsNotificationState([{ id: chatId, state: {} }])
       }
 
-      const role = getRoleFromStatus("left")
-      await createOrUpdateChatMember(chatId, message.left_chat_member.id, role)
+      if (isGroup && message.left_chat_member) {
+        const storedChat = await getChatById(chatId)
+        if (storedChat && storedChat.createdBy === message.left_chat_member.id) {
+          const { updateChatsNotificationState } = await import("@/lib/chat-store")
+          await updateChatsNotificationState([{ id: chatId, state: {} }])
+        }
+
+        const role = getRoleFromStatus("left")
+        await createOrUpdateChatMember(chatId, message.left_chat_member.id, role)
+      }
     }
 
     if (update.my_chat_member) {
@@ -237,7 +226,6 @@ export async function POST(request: Request) {
                 chatId: chat.id,
                 name: topic.name,
                 iconColor: topic.icon_color,
-                iconCustomEmojiId: 'icon_custom_emoji_id' in topic && topic.icon_custom_emoji_id ? Number(topic.icon_custom_emoji_id) : undefined,
               })
             }
           }
@@ -247,17 +235,19 @@ export async function POST(request: Request) {
       }
     }
 
-    if (update.forum_topic_created) {
-      const { name, icon_color, icon_custom_emoji_id, thread_id } = update.forum_topic_created
+    if (message?.forum_topic_created && message.message_thread_id && message.chat?.id) {
+      const { name, icon_color, icon_custom_emoji_id } = message.forum_topic_created
+      const threadId = message.message_thread_id
+      const chatId = message.chat.id
       console.log("=== forum_topic_created event ===", {
         chatId,
-        thread_id,
+        thread_id: threadId,
         name,
         icon_color,
         icon_custom_emoji_id,
       })
       await upsertChatTopic({
-        id: thread_id,
+        id: threadId,
         chatId: chatId,
         name,
         iconColor: icon_color,
@@ -266,20 +256,18 @@ export async function POST(request: Request) {
       console.log("Topic created/updated in database")
     }
 
-    if (update.forum_topic_edited) {
-      const { name, icon_custom_emoji_id, thread_id } = update.forum_topic_edited
+    if (message?.forum_topic_edited && message.message_thread_id && message.chat?.id) {
+      const { name, icon_custom_emoji_id } = message.forum_topic_edited
+      const threadId = message.message_thread_id
+      const chatId = message.chat.id
       if (name) {
         await upsertChatTopic({
-          id: thread_id,
+          id: threadId,
           chatId: chatId,
           name,
           iconCustomEmojiId: icon_custom_emoji_id ? Number(icon_custom_emoji_id) : undefined,
         })
       }
-    }
-
-    if (update.forum_topic_closed || update.forum_topic_reopened) {
-      const { thread_id } = update.forum_topic_closed || update.forum_topic_reopened!
     }
 
     return NextResponse.json({ ok: true })

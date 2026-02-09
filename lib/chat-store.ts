@@ -82,16 +82,22 @@ export async function upsertChat(payload: {
   const now = new Date().toISOString()
   const chatId = Number(payload.chat.id)
 
+  const { data: existingChat } = await supabase
+    .from("chats")
+    .select("settings, topic_id, created_by, is_forum")
+    .eq("id", chatId)
+    .maybeSingle()
+
   const chatData = {
     id: chatId,
     type: payload.chat.type,
     title: payload.chat.title ?? null,
     username: payload.chat.username ?? null,
     photo_url: payload.chat.photo_url ?? null,
-    settings: payload.settings ?? null,
-    topic_id: payload.topicId ?? null,
-    created_by: payload.createdBy ?? null,
-    is_forum: payload.isForum ?? false,
+    settings: payload.settings === undefined ? ((existingChat?.settings as UserSettings) ?? null) : payload.settings,
+    topic_id: payload.topicId === undefined ? (existingChat?.topic_id ?? null) : payload.topicId,
+    created_by: payload.createdBy === undefined ? (existingChat?.created_by ?? null) : payload.createdBy,
+    is_forum: payload.isForum === undefined ? (existingChat?.is_forum ?? false) : payload.isForum,
     updated_at: now,
     last_seen_at: now,
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { getChatById, listChatTopics, getChatMemberRole, upsertChat } from "@/lib/chat-store"
-import { isAdmin, getChat } from "@/lib/telegram-api"
+import { getChatById, listChatTopics, getChatMemberRole, upsertChat, upsertChatTopic } from "@/lib/chat-store"
+import { isAdmin, getChat, getForumTopics } from "@/lib/telegram-api"
 
 export const runtime = "nodejs"
 
@@ -101,6 +101,20 @@ export async function GET(
         updatedAt: chat.updatedAt,
       }
       return NextResponse.json({ topics: [mainTopic] })
+    }
+
+    if (botToken) {
+      const telegramTopics = await getForumTopics(botToken, chatId)
+      if (telegramTopics && telegramTopics.length > 0) {
+        for (const topic of telegramTopics) {
+          await upsertChatTopic({
+            id: topic.id,
+            chatId,
+            name: topic.name,
+            iconColor: topic.icon_color,
+          })
+        }
+      }
     }
 
     console.log("Chat is a forum, loading topics from database")

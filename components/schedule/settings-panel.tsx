@@ -240,14 +240,17 @@ export function SettingsPanel({
   }
 
   useEffect(() => {
-    if (!tempFacultySlug) return
-    if (coursesByFaculty[tempFacultySlug]) return
+    const missingFacultySlug = [tempFacultySlug, tempGroupFacultySlug].find(
+      (slug): slug is string => Boolean(slug && !coursesByFaculty[slug])
+    )
+
+    if (!missingFacultySlug) return
 
     let cancelled = false
     setIsLoadingCourses(true)
     setCoursesError(null)
 
-    fetch(`/api/faculties/${tempFacultySlug}/courses`)
+    fetch(`/api/faculties/${missingFacultySlug}/courses`)
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Failed to load courses")
@@ -256,7 +259,7 @@ export function SettingsPanel({
         if (!cancelled) {
           setCoursesByFaculty((prev) => ({
             ...prev,
-            [tempFacultySlug]: data.courses || [],
+            [missingFacultySlug]: data.courses || [],
           }))
         }
       })
@@ -274,7 +277,7 @@ export function SettingsPanel({
     return () => {
       cancelled = true
     }
-  }, [tempFacultySlug, coursesByFaculty])
+  }, [tempFacultySlug, tempGroupFacultySlug, coursesByFaculty])
 
   useEffect(() => {
     if (view !== "time") return
@@ -645,6 +648,20 @@ export function SettingsPanel({
   })
   const selectedCourse = availableCourses.find((course) => course.number === tempCourse)
   const availableGroups = selectedCourse?.groups || []
+
+  const availableGroupCourses = tempGroupFacultySlug ? coursesByFaculty[tempGroupFacultySlug] || [] : []
+  const sortedGroupCourses = [...availableGroupCourses].sort((first, second) => {
+    const firstHasMaster = first.groups.some((group) => MASTER_GROUP_PATTERN.test(group.name))
+    const secondHasMaster = second.groups.some((group) => MASTER_GROUP_PATTERN.test(group.name))
+
+    if (firstHasMaster !== secondHasMaster) {
+      return firstHasMaster ? -1 : 1
+    }
+
+    return first.number - second.number
+  })
+  const selectedGroupCourse = availableGroupCourses.find((course) => course.number === tempGroupCourse)
+  const availableGroupOptions = selectedGroupCourse?.groups || []
   const hours = Array.from({ length: 24 }, (_, index) => index)
   const minutes = Array.from({ length: 60 }, (_, index) => index)
 
@@ -968,22 +985,19 @@ export function SettingsPanel({
                                 Тема для уведомлений
                               </h3>
                               <div className="relative">
-                                <select
-                                  value={selectedTopicId === null ? "" : String(selectedTopicId)}
-                                  onChange={(e) => {
-                                    const value = e.target.value === "" ? null : Number(e.target.value)
-                                    handleUpdateTopic(value)
-                                  }}
-                                  disabled={userRole === "member"}
+                                  <select
+                                    value={selectedTopicId === null ? "__main__" : String(selectedTopicId)}
+                                    onChange={(e) => {
+                                      const value = e.target.value === "__main__" ? null : Number(e.target.value)
+                                      handleUpdateTopic(value)
+                                    }}
+                                    disabled={userRole === "member"}
                                   className={cn(
                                     "w-full flex items-center justify-between p-4 bg-card rounded-xl border border-border appearance-none cursor-pointer text-foreground",
                                     userRole === "member" && "opacity-50 cursor-not-allowed"
                                   )}
                                 >
-                                  <option value="" disabled>
-                                    {isLoadingTopics ? "Загрузка тем..." : "Выберите тему"}
-                                  </option>
-                                  <option value="">
+                                  <option value="__main__">
                                     Без темы (в общий чат)
                                   </option>
                                   {topics.map((topic) => (
@@ -1295,13 +1309,13 @@ export function SettingsPanel({
                       {coursesError}
                     </div>
                   )}
-                  {tempGroupFacultySlug && !isLoadingCourses && !coursesError && sortedCourses.length === 0 && (
+                  {tempGroupFacultySlug && !isLoadingCourses && !coursesError && sortedGroupCourses.length === 0 && (
                     <div className="px-4 py-8 text-center text-muted-foreground">
                       Нет доступных курсов
                     </div>
                   )}
-                  {tempGroupFacultySlug && !isLoadingCourses && !coursesError && sortedCourses.length > 0 && (
-                    sortedCourses.map((course) => (
+                  {tempGroupFacultySlug && !isLoadingCourses && !coursesError && sortedGroupCourses.length > 0 && (
+                    sortedGroupCourses.map((course) => (
                       <button
                         key={course.number}
                         type="button"
@@ -1355,8 +1369,8 @@ export function SettingsPanel({
                       {coursesError}
                     </div>
                   )}
-                  {tempGroupCourse && !isLoadingCourses && availableGroups.length > 0 ? (
-                    availableGroups.map((group) => (
+                  {tempGroupCourse && !isLoadingCourses && availableGroupOptions.length > 0 ? (
+                    availableGroupOptions.map((group) => (
                       <button
                         key={group.slug}
                         type="button"
@@ -1597,8 +1611,8 @@ export function SettingsPanel({
                       {coursesError}
                     </div>
                   )}
-                  {tempFacultySlug && !isLoadingCourses && availableCourses.length > 0 ? (
-                    availableCourses.map((course) => (
+                  {tempFacultySlug && !isLoadingCourses && sortedCourses.length > 0 ? (
+                    sortedCourses.map((course) => (
                       <button
                         key={course.number}
                         type="button"
@@ -1608,7 +1622,24 @@ export function SettingsPanel({
                           course.number === tempCourse && "bg-primary/5"
                         )}
                       >
-                        <span className="font-medium text-foreground">{course.number} курс</span>
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={cn(
+                              "h-12 w-12 rounded-2xl flex items-center justify-center text-2xl font-semibold",
+                              COURSE_BADGE_STYLES[
+                                (course.number - 1) % COURSE_BADGE_STYLES.length
+                              ]
+                            )}
+                          >
+                            {course.number}
+                          </div>
+                          <div className="text-left">
+                            <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                              Курс
+                            </div>
+                            <div className="font-medium text-foreground">{course.name}</div>
+                          </div>
+                        </div>
                         {course.number === tempCourse && (
                           <Check className="h-5 w-5 text-primary" />
                         )}
