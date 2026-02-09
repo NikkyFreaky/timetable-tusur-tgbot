@@ -82,16 +82,22 @@ export async function upsertChat(payload: {
   const now = new Date().toISOString()
   const chatId = Number(payload.chat.id)
 
+  const { data: existingChat } = await supabase
+    .from("chats")
+    .select("settings, topic_id, created_by, is_forum")
+    .eq("id", chatId)
+    .maybeSingle()
+
   const chatData = {
     id: chatId,
     type: payload.chat.type,
     title: payload.chat.title ?? null,
     username: payload.chat.username ?? null,
     photo_url: payload.chat.photo_url ?? null,
-    settings: payload.settings ?? null,
-    topic_id: payload.topicId ?? null,
-    created_by: payload.createdBy ?? null,
-    is_forum: payload.isForum ?? false,
+    settings: payload.settings === undefined ? ((existingChat?.settings as UserSettings) ?? null) : payload.settings,
+    topic_id: payload.topicId === undefined ? (existingChat?.topic_id ?? null) : payload.topicId,
+    created_by: payload.createdBy === undefined ? (existingChat?.created_by ?? null) : payload.createdBy,
+    is_forum: payload.isForum === undefined ? (existingChat?.is_forum ?? false) : payload.isForum,
     updated_at: now,
     last_seen_at: now,
   }
@@ -207,14 +213,21 @@ export async function updateChatMemberRole(
 }
 
 export async function listChatTopics(chatId: number): Promise<ChatTopic[]> {
+  console.log("=== listChatTopics called ===", { chatId })
+
   const { data: topics } = await supabase
     .from("chat_topics")
     .select()
     .eq("chat_id", chatId)
 
-  if (!topics) return []
+  console.log("Topics from database:", topics)
 
-  return topics.map((t: any) => ({
+  if (!topics) {
+    console.log("No topics found")
+    return []
+  }
+
+  const mappedTopics = topics.map((t: any) => ({
     id: t.id,
     chatId: t.chat_id,
     name: t.name,
@@ -223,6 +236,10 @@ export async function listChatTopics(chatId: number): Promise<ChatTopic[]> {
     createdAt: t.created_at,
     updatedAt: t.updated_at,
   }))
+
+  console.log("Mapped topics:", mappedTopics)
+
+  return mappedTopics
 }
 
 export async function upsertChatTopic(topic: {
@@ -234,34 +251,33 @@ export async function upsertChatTopic(topic: {
 }): Promise<ChatTopic> {
   const now = new Date().toISOString()
 
-  const { data: existing } = await supabase
-    .from("chat_topics")
-    .select()
-    .eq("id", topic.id)
-    .eq("chat_id", topic.chatId)
-    .single()
+  console.log("=== upsertChatTopic called ===", {
+    topicId: topic.id,
+    chatId: topic.chatId,
+    name: topic.name,
+    iconColor: topic.iconColor,
+    iconCustomEmojiId: topic.iconCustomEmojiId,
+  })
 
-  if (existing) {
-    await supabase
-      .from("chat_topics")
-      .update({
+  const { error: upsertError } = await supabase
+    .from("chat_topics")
+    .upsert(
+      {
+        id: topic.id,
+        chat_id: topic.chatId,
         name: topic.name,
         icon_color: topic.iconColor ?? null,
         icon_custom_emoji_id: topic.iconCustomEmojiId ?? null,
+        created_at: now,
         updated_at: now,
-      })
-      .eq("id", topic.id)
-      .eq("chat_id", topic.chatId)
+      },
+      { onConflict: "chat_id,id" }
+    )
+
+  if (upsertError) {
+    console.error("Failed to upsert topic:", upsertError)
   } else {
-    await supabase.from("chat_topics").insert({
-      id: topic.id,
-      chat_id: topic.chatId,
-      name: topic.name,
-      icon_color: topic.iconColor ?? null,
-      icon_custom_emoji_id: topic.iconCustomEmojiId ?? null,
-      created_at: now,
-      updated_at: now,
-    })
+    console.log("Topic upserted successfully")
   }
 
   return {
@@ -284,6 +300,19 @@ export async function deleteChatTopic(chatId: number, topicId: number): Promise<
 }
 
 export async function updateChatTopicId(chatId: number, topicId: number | null): Promise<void> {
+  if (topicId !== null) {
+    const { data: topic } = await supabase
+      .from("chat_topics")
+      .select("id")
+      .eq("chat_id", chatId)
+      .eq("id", topicId)
+      .maybeSingle()
+
+    if (!topic) {
+      throw new Error("Topic not found for chat")
+    }
+  }
+
   await supabase
     .from("chats")
     .update({
