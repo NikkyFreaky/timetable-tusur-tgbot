@@ -89,18 +89,17 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const mainTopic = {
-      id: null as any,
-      chatId,
-      name: "Основной чат",
-      iconColor: null,
-      iconCustomEmojiId: null,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
-    }
-
     if (!chat.isForum) {
       console.log("Chat is not a forum, returning main topic only")
+      const mainTopic = {
+        id: null as any,
+        chatId,
+        name: "Основной чат",
+        iconColor: null,
+        iconCustomEmojiId: null,
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt,
+      }
       return NextResponse.json({ topics: [mainTopic] })
     }
 
@@ -110,9 +109,9 @@ export async function GET(
 
     console.log("Topics loaded from database:", topics)
 
-    return NextResponse.json({
-      topics: [mainTopic, ...topics],
-    })
+    // For forums, the general topic is handled separately
+    // Return the actual topics from the database
+    return NextResponse.json({ topics })
   } catch (error) {
     console.error("Failed to load chat topics:", error)
     return NextResponse.json({ error: "Failed to load chat topics" }, { status: 500 })

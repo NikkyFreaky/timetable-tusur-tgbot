@@ -969,8 +969,11 @@ export function SettingsPanel({
                               </h3>
                               <div className="relative">
                                 <select
-                                  value={selectedTopicId || ""}
-                                  onChange={(e) => handleUpdateTopic(e.target.value ? Number(e.target.value) : null)}
+                                  value={selectedTopicId === null ? "" : String(selectedTopicId)}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? null : Number(e.target.value)
+                                    handleUpdateTopic(value)
+                                  }}
                                   disabled={userRole === "member"}
                                   className={cn(
                                     "w-full flex items-center justify-between p-4 bg-card rounded-xl border border-border appearance-none cursor-pointer text-foreground",
@@ -981,7 +984,7 @@ export function SettingsPanel({
                                     {isLoadingTopics ? "Загрузка тем..." : "Выберите тему"}
                                   </option>
                                   <option value="">
-                                    Без темы (общий чат)
+                                    Без темы (в общий чат)
                                   </option>
                                   {topics.map((topic) => (
                                     <option key={topic.id} value={topic.id}>
