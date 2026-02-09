@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { buildWebAppKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
 import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getForumTopics } from "@/lib/telegram-api"
-import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById } from "@/lib/chat-store"
+import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById, markChatMembersInactive } from "@/lib/chat-store"
 
 export const runtime = "nodejs"
 
@@ -167,41 +167,36 @@ export async function POST(request: Request) {
 
     if (update.my_chat_member) {
       const { chat, new_chat_member } = update.my_chat_member
+      const newRole = getRoleFromStatus(new_chat_member.status as any)
 
-      if (new_chat_member.status === "left") {
-        const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
-        if (memberInfo) {
-          const role = getRoleFromStatus(memberInfo.status)
-          await createOrUpdateChatMember(chat.id, new_chat_member.user.id, role)
-        }
-      } else if (new_chat_member.status === "member") {
-        const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
-        if (memberInfo) {
-          const role = getRoleFromStatus(memberInfo.status)
+      if (new_chat_member.status === "left" || new_chat_member.status === "kicked") {
+        await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
+        await markChatMembersInactive(chat.id)
+        const { updateChatsNotificationState } = await import("@/lib/chat-store")
+        await updateChatsNotificationState([{ id: chat.id, state: {} }])
+      } else if (new_chat_member.status === "member" || new_chat_member.status === "administrator") {
+        await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
 
-          if (role === "creator" || role === "administrator") {
-            const chatInfo = await getChat(botToken, chat.id)
-            const isForum = chatInfo?.is_forum ?? false
+        const chatInfo = await getChat(botToken, chat.id)
+        const isForum = chatInfo?.is_forum ?? false
 
-            await upsertChat({
-              chat: chat,
-              isForum,
-            })
+        await upsertChat({
+          chat: chat,
+          isForum,
+        })
 
-            // Sync all administrators of group
-            const admins = await getChatAdministrators(botToken, chat.id)
-            if (admins) {
-              for (const admin of admins) {
-                const adminRole = getRoleFromStatus(admin.status)
-                await createOrUpdateChatMember(chat.id, admin.user.id, adminRole)
-              }
-            }
-
-            await sendTelegramMessage(botToken, chat.id,
-              "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
-            )
+        // Sync all administrators of group
+        const admins = await getChatAdministrators(botToken, chat.id)
+        if (admins) {
+          for (const admin of admins) {
+            const adminRole = getRoleFromStatus(admin.status)
+            await createOrUpdateChatMember(chat.id, admin.user.id, adminRole)
           }
         }
+
+        await sendTelegramMessage(botToken, chat.id,
+          "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
+        )
       }
     }
 
