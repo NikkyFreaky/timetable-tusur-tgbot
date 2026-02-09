@@ -445,6 +445,7 @@ export function ScheduleApp() {
         onUpdateSettings={updateSettings}
         onResetSettings={resetSettings}
         scopeLabel={scopeLabel}
+        userId={user?.id}
       />
     </div>
   )

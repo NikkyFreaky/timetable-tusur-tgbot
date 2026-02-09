@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { buildWebAppKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
-import { getChat, getChatMember, getRoleFromStatus } from "@/lib/telegram-api"
+import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus } from "@/lib/telegram-api"
 import { upsertChat, createOrUpdateChatMember, upsertChatTopic, deleteChatTopic, getChatById } from "@/lib/chat-store"
 
 export const runtime = "nodejs"
@@ -120,8 +120,10 @@ export async function POST(request: Request) {
     }
 
     if (isGroup && message.new_chat_members) {
+      console.log("new_chat_members event in chat:", chatId, message.new_chat_members)
       for (const member of message.new_chat_members) {
         if (member.is_bot) {
+          console.log("Bot added to chat:", chatId)
           const chatInfo = await getChat(botToken, chatId)
           const isForum = chatInfo?.is_forum ?? false
 
@@ -130,14 +132,28 @@ export async function POST(request: Request) {
             isForum,
           })
 
-          await sendTelegramMessage(botToken, chatId, 
+          // Sync all administrators of the group
+          const admins = await getChatAdministrators(botToken, chatId)
+          if (admins) {
+            for (const admin of admins) {
+              const role = getRoleFromStatus(admin.status)
+              await createOrUpdateChatMember(chatId, admin.user.id, role)
+              console.log("Admin synced:", chatId, admin.user.id, role)
+            }
+          }
+
+          await sendTelegramMessage(botToken, chatId,
             "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
           )
         } else {
+          console.log("Member added to chat:", chatId, "member:", member.id)
           const memberInfo = await getChatMember(botToken, chatId, member.id)
+          console.log("Member info from Telegram:", memberInfo)
           if (memberInfo) {
             const role = getRoleFromStatus(memberInfo.status)
+            console.log("Role:", role)
             await createOrUpdateChatMember(chatId, member.id, role)
+            console.log("Chat member created/updated")
           }
         }
       }
@@ -167,7 +183,6 @@ export async function POST(request: Request) {
         const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
         if (memberInfo) {
           const role = getRoleFromStatus(memberInfo.status)
-          await createOrUpdateChatMember(chat.id, new_chat_member.user.id, role)
 
           if (role === "creator" || role === "administrator") {
             const chatInfo = await getChat(botToken, chat.id)
@@ -178,7 +193,16 @@ export async function POST(request: Request) {
               isForum,
             })
 
-            await sendTelegramMessage(botToken, chat.id, 
+            // Sync all administrators of group
+            const admins = await getChatAdministrators(botToken, chat.id)
+            if (admins) {
+              for (const admin of admins) {
+                const adminRole = getRoleFromStatus(admin.status)
+                await createOrUpdateChatMember(chat.id, admin.user.id, adminRole)
+              }
+            }
+
+            await sendTelegramMessage(botToken, chat.id,
               "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
             )
           }
@@ -188,11 +212,14 @@ export async function POST(request: Request) {
 
     if (update.chat_member) {
       const { chat, new_chat_member, old_chat_member } = update.chat_member
+      console.log("chat_member event in chat:", chat.id, "user:", new_chat_member.user.id)
       const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
+      console.log("Member info from Telegram:", memberInfo)
 
       if (memberInfo) {
         const status = memberInfo.status as any
         const newRole = getRoleFromStatus(status)
+        console.log("New role:", newRole)
 
         if (status === "left") {
           const storedChat = await getChatById(chat.id)
@@ -203,6 +230,7 @@ export async function POST(request: Request) {
         }
 
         await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
+        console.log("Chat member created/updated")
       }
     }
 

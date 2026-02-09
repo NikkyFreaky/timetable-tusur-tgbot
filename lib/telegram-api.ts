@@ -109,6 +109,15 @@ export async function getChatMember(
   })
 }
 
+export async function getChatAdministrators(
+  botToken: string,
+  chatId: number
+): Promise<ChatMemberInfo[] | null> {
+  return telegramFetch<ChatMemberInfo[]>(botToken, "getChatAdministrators", {
+    chat_id: chatId,
+  })
+}
+
 export function getRoleFromStatus(status: ChatMemberInfo["status"]): "creator" | "administrator" | "member" | "left" | "kicked" {
   if (status === "creator") return "creator"
   if (status === "administrator") return "administrator"
