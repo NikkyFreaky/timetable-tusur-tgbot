@@ -212,6 +212,17 @@ export async function updateChatMemberRole(
     .eq("user_id", userId)
 }
 
+export async function markChatMembersInactive(chatId: number) {
+  await supabase
+    .from("chat_members")
+    .update({
+      role: "left",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("chat_id", chatId)
+    .in("role", ["creator", "administrator", "member"])
+}
+
 export async function listChatTopics(chatId: number): Promise<ChatTopic[]> {
   console.log("=== listChatTopics called ===", { chatId })
 
