@@ -26,6 +26,12 @@ type ChatInfo = {
   join_by_request?: boolean
   has_restricted_voice_and_video_messages?: boolean
   is_forum?: boolean
+  forum_topics?: Array<{
+    id: number
+    name: string
+    icon_color_id: number
+    thread_id: number
+  }>
   forum_chat_created?: boolean
   active_usernames?: string[]
   emoji_status_custom_emoji_id?: string
@@ -116,6 +122,35 @@ export async function getChatAdministrators(
   return telegramFetch<ChatMemberInfo[]>(botToken, "getChatAdministrators", {
     chat_id: chatId,
   })
+}
+
+export async function getForumTopics(
+  botToken: string,
+  chatId: number
+): Promise<Array<{ id: number; name: string; icon_color: number | null }> | null> {
+  const chatInfo = await getChat(botToken, chatId)
+
+  if (!chatInfo) {
+    return null
+  }
+
+  if (!chatInfo.is_forum) {
+    return []
+  }
+
+  const topics: Array<{ id: number; name: string; icon_color: number | null }> = []
+
+  if (chatInfo.forum_topics && Array.isArray(chatInfo.forum_topics)) {
+    for (const topic of chatInfo.forum_topics) {
+      topics.push({
+        id: topic.thread_id,
+        name: topic.name,
+        icon_color: topic.icon_color_id,
+      })
+    }
+  }
+
+  return topics
 }
 
 export function getRoleFromStatus(status: ChatMemberInfo["status"]): "creator" | "administrator" | "member" | "left" | "kicked" {

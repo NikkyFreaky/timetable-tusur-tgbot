@@ -77,7 +77,7 @@ export function SettingsPanel({
   const hourScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minuteScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestTimeParts = useRef(parseNotificationTime(settings.notificationTime))
-  
+
   // Group settings state
   const [chats, setChats] = useState<StoredChat[]>([])
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
@@ -902,7 +902,7 @@ export function SettingsPanel({
                   {!userId && (
                     <div className="px-4 py-8 text-center text-muted-foreground">
                       Групповые настройки доступны только через Telegram Mini App.
-                      Откройте приложение через бота @timetable_tusur_bot.
+                      Откройте приложение через бота @timetable_tusur_tg_bot.
                     </div>
                   )}
                   {userId && isLoadingChats && (

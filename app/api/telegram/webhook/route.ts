@@ -212,7 +212,8 @@ export async function POST(request: Request) {
 
     if (update.chat_member) {
       const { chat, new_chat_member, old_chat_member } = update.chat_member
-      console.log("chat_member event in chat:", chat.id, "user:", new_chat_member.user.id)
+      console.log("=== chat_member event ===", { chatId: chat.id, "user:", new_chat_member.user.id, "status:", new_chat_member.status, "oldStatus:", old_chat_member?.status })
+
       const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
       console.log("Member info from Telegram:", memberInfo)
 
@@ -221,12 +222,28 @@ export async function POST(request: Request) {
         const newRole = getRoleFromStatus(status)
         console.log("New role:", newRole)
 
-        if (status === "left") {
-          const storedChat = await getChatById(chat.id)
-          if (storedChat && storedChat.createdBy === new_chat_member.user.id) {
-            const { updateChatsNotificationState } = await import("@/lib/chat-store")
-            await updateChatsNotificationState([{ id: chat.id, state: {} }])
+        await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
+
+        if ((newRole === "creator" || newRole === "administrator") && !new_chat_member.user.is_bot) {
+          console.log("User is now admin, syncing topics...")
+          const topics = await getForumTopics(botToken, chat.id)
+          console.log("Topics from Telegram API:", topics)
+
+          for (const topic of topics) {
+            console.log("Upserting topic:", topic)
+            await upsertChatTopic({
+              id: topic.id,
+              chatId: chat.id,
+              name: topic.name,
+              iconColor: topic.icon_color,
+              iconCustomEmojiId: topic.icon_custom_emoji_id ? Number(topic.icon_custom_emoji_id) : undefined,
+            })
           }
+
+          console.log("Topics synced to database")
+        }
+      }
+    }
         }
 
         await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
