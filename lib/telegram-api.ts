@@ -109,6 +109,34 @@ export async function getChatMember(
   })
 }
 
+export async function getChatAdministrators(
+  botToken: string,
+  chatId: number
+): Promise<ChatMemberInfo[] | null> {
+  return telegramFetch<ChatMemberInfo[]>(botToken, "getChatAdministrators", {
+    chat_id: chatId,
+  })
+}
+
+export async function getForumTopics(
+  botToken: string,
+  chatId: number
+): Promise<Array<{ id: number; name: string; icon_color: number | null }> | null> {
+  const chatInfo = await getChat(botToken, chatId)
+
+  if (!chatInfo) {
+    return null
+  }
+
+  if (!chatInfo.is_forum) {
+    return []
+  }
+
+  // Telegram Bot API does not expose an endpoint for listing existing forum topics.
+  // Topics must be cached from webhook updates (forum_topic_created/edited and topic messages).
+  return []
+}
+
 export function getRoleFromStatus(status: ChatMemberInfo["status"]): "creator" | "administrator" | "member" | "left" | "kicked" {
   if (status === "creator") return "creator"
   if (status === "administrator") return "administrator"

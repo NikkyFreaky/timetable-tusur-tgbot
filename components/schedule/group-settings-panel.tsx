@@ -55,17 +55,22 @@ export function GroupSettingsPanel({
       return
     }
 
-    const loadChats = async () => {
-      setIsLoadingChats(true)
-      setChatsError(null)
+  const loadChats = async () => {
+    if (!userId) {
+      setChatsError("Не удалось получить ID пользователя")
+      return
+    }
 
-      try {
-        const response = await fetch(`/api/users/${userId}/chats`)
-        if (!response.ok) {
-          throw new Error("Failed to load chats")
-        }
-        const data = await response.json()
-        setChats(data.chats || [])
+    setIsLoadingChats(true)
+    setChatsError(null)
+
+    try {
+      const response = await fetch(`/api/users/${userId}/chats`)
+      if (!response.ok) {
+        throw new Error("Failed to load chats")
+      }
+      const data = await response.json()
+      setChats(data.chats || [])
 
         if (data.chats && data.chats.length > 0) {
           setSelectedChatId(data.chats[0].id)

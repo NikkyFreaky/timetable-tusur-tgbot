@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Calendar, Settings, Sparkles, Users } from "lucide-react"
+import { Calendar, Settings, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DAY_NAMES, type DaySchedule } from "@/lib/schedule-types"
 import {
@@ -22,8 +22,6 @@ import { DaySelector } from "./day-selector"
 import { DayView } from "./day-view"
 import { UpcomingClasses } from "./upcoming-classes"
 import { SettingsPanel } from "./settings-panel"
-import { GroupSettingsPanel } from "./group-settings-panel"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const buildEmptySchedule = (): DaySchedule[] =>
   DAY_NAMES.map((name, index) => ({
@@ -85,6 +83,9 @@ const formatTime = (date: Date): string => {
 export function ScheduleApp() {
   const { hapticFeedback, isReady, chat, user } = useTelegram()
   const { settings, updateSettings, resetSettings } = useSettings()
+
+  console.log("ScheduleApp rendered:", { user, chat, isReady })
+
   const scopeLabel =
     chat?.type && chat.type !== "private"
       ? `Настройки чата: ${chat.title || "без названия"}`
@@ -103,8 +104,9 @@ export function ScheduleApp() {
   const [isScheduleLoading, setIsScheduleLoading] = useState(false)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [apiWeekType, setApiWeekType] = useState<"even" | "odd" | null>(null)
-  const [activeTab, setActiveTab] = useState<"schedule" | "groups">("schedule")
-  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
+  
+  const isPrivateChat = chat?.type === "private"
+  const isGroupChat = chat?.type === "group" || chat?.type === "supergroup"
 
   // Derived state - week type is calculated from selected monday
   const computedWeekType = useMemo(() => getWeekType(selectedMonday), [selectedMonday])
@@ -244,11 +246,7 @@ export function ScheduleApp() {
             type="button"
             onClick={() => {
               hapticFeedback("light")
-              if (activeTab === "groups") {
-                setGroupSettingsOpen(true)
-              } else {
-                setSettingsOpen(true)
-              }
+              setSettingsOpen(true)
             }}
             className="p-2 rounded-full hover:bg-accent active:bg-accent/70 transition-colors"
           >
@@ -256,69 +254,55 @@ export function ScheduleApp() {
           </button>
         </div>
 
-        {/* Tabs - only show in private chats */}
-        {chat?.type === "private" && (
+        {/* Week Navigation - only show in private chats */}
+        {!isGroupChat && (
           <div className="px-4 pb-3">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schedule" | "groups")}>
-              <TabsList className="w-full">
-                <TabsTrigger value="schedule" className="flex-1">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Расписание
-                </TabsTrigger>
-                <TabsTrigger value="groups" className="flex-1">
-                  <Users className="h-4 w-4 mr-2" />
-                  Группы
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <WeekToggle
+              weekType={weekType}
+              monday={selectedMonday}
+              isCurrentWeek={isCurrentWeek}
+              onPrevWeek={handlePrevWeek}
+              onNextWeek={handleNextWeek}
+              onGoToToday={handleGoToToday}
+            />
           </div>
         )}
 
-        {/* Week Navigation */}
-        <div className="px-4 pb-3">
-          <WeekToggle
-            weekType={weekType}
-            monday={selectedMonday}
-            isCurrentWeek={isCurrentWeek}
-            onPrevWeek={handlePrevWeek}
-            onNextWeek={handleNextWeek}
-            onGoToToday={handleGoToToday}
-          />
-        </div>
-
-        {/* View Mode Toggle */}
-        <div className="flex border-t border-border">
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback("selection")
-              setViewMode("day")
-            }}
-            className={cn(
-              "flex-1 py-2.5 text-sm font-medium transition-colors",
-              viewMode === "day"
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted-foreground"
-            )}
-          >
-            По дням
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback("selection")
-              setViewMode("upcoming")
-            }}
-            className={cn(
-              "flex-1 py-2.5 text-sm font-medium transition-colors",
-              viewMode === "upcoming"
-                ? "text-primary border-b-2 border-primary"
-                : "text-muted-foreground"
-            )}
-          >
-            Ближайшие
-          </button>
-        </div>
+        {/* View Mode Toggle - only show in private chats */}
+        {!isGroupChat && (
+          <div className="flex border-t border-border">
+            <button
+              type="button"
+              onClick={() => {
+                hapticFeedback("selection")
+                setViewMode("day")
+              }}
+              className={cn(
+                "flex-1 py-2.5 text-sm font-medium transition-colors",
+                viewMode === "day"
+                  ? "text-primary border-b-2 border-primary"
+                  : "text-muted-foreground"
+              )}
+            >
+              По дням
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                hapticFeedback("selection")
+                setViewMode("upcoming")
+              }}
+              className={cn(
+                "flex-1 py-2.5 text-sm font-medium transition-colors",
+                viewMode === "upcoming"
+                  ? "text-primary border-b-2 border-primary"
+                  : "text-muted-foreground"
+              )}
+            >
+              Ближайшие
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -464,16 +448,8 @@ export function ScheduleApp() {
         onUpdateSettings={updateSettings}
         onResetSettings={resetSettings}
         scopeLabel={scopeLabel}
+        userId={user?.id}
       />
-
-      {/* Group Settings Panel */}
-      {user?.id && (
-        <GroupSettingsPanel
-          userId={user.id}
-          isOpen={groupSettingsOpen}
-          onOpenChange={setGroupSettingsOpen}
-        />
-      )}
     </div>
   )
 }
