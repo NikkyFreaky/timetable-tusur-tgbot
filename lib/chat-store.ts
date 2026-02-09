@@ -259,32 +259,10 @@ export async function upsertChatTopic(topic: {
     iconCustomEmojiId: topic.iconCustomEmojiId,
   })
 
-  const { data: existing } = await supabase
+  const { error: upsertError } = await supabase
     .from("chat_topics")
-    .select()
-    .eq("id", topic.id)
-    .eq("chat_id", topic.chatId)
-    .single()
-
-  console.log("Existing topic check:", existing)
-
-  if (existing) {
-    console.log("Updating existing topic...")
-    await supabase
-      .from("chat_topics")
-      .update({
-        name: topic.name,
-        icon_color: topic.iconColor ?? null,
-        icon_custom_emoji_id: topic.iconCustomEmojiId ?? null,
-        updated_at: now,
-      })
-      .eq("id", topic.id)
-      .eq("chat_id", topic.chatId)
-  } else {
-    console.log("Inserting new topic...")
-    const { error: insertError } = await supabase
-      .from("chat_topics")
-      .insert({
+    .upsert(
+      {
         id: topic.id,
         chat_id: topic.chatId,
         name: topic.name,
@@ -292,15 +270,14 @@ export async function upsertChatTopic(topic: {
         icon_custom_emoji_id: topic.iconCustomEmojiId ?? null,
         created_at: now,
         updated_at: now,
-      })
-      .select()
-      .single()
+      },
+      { onConflict: "chat_id,id" }
+    )
 
-    if (insertError) {
-      console.error("Failed to insert topic:", insertError)
-    } else {
-      console.log("Topic inserted successfully")
-    }
+  if (upsertError) {
+    console.error("Failed to upsert topic:", upsertError)
+  } else {
+    console.log("Topic upserted successfully")
   }
 
   return {
@@ -323,6 +300,19 @@ export async function deleteChatTopic(chatId: number, topicId: number): Promise<
 }
 
 export async function updateChatTopicId(chatId: number, topicId: number | null): Promise<void> {
+  if (topicId !== null) {
+    const { data: topic } = await supabase
+      .from("chat_topics")
+      .select("id")
+      .eq("chat_id", chatId)
+      .eq("id", topicId)
+      .maybeSingle()
+
+    if (!topic) {
+      throw new Error("Topic not found for chat")
+    }
+  }
+
   await supabase
     .from("chats")
     .update({

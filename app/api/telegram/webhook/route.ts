@@ -11,6 +11,7 @@ type TelegramUpdate = {
     message_id: number
     chat: { id: number; type: string; title?: string; username?: string; photo_url?: string }
     message_thread_id?: number
+    is_topic_message?: boolean
     text?: string
     forum_topic_created?: {
       name: string
@@ -25,6 +26,11 @@ type TelegramUpdate = {
     forum_topic_reopened?: Record<string, never>
     general_forum_topic_hidden?: Record<string, never>
     general_forum_topic_unhidden?: Record<string, never>
+    reply_to_message?: {
+      forum_topic_created?: {
+        name: string
+      }
+    }
     from?: {
       id: number
       is_bot?: boolean
@@ -233,6 +239,28 @@ export async function POST(request: Request) {
           console.log("Topics synced to database")
         }
       }
+    }
+
+    if (message?.chat?.id && message.message_thread_id && message.is_topic_message) {
+      const threadId = message.message_thread_id
+      const chatId = message.chat.id
+      const topicName =
+        message.forum_topic_created?.name ||
+        message.forum_topic_edited?.name ||
+        message.reply_to_message?.forum_topic_created?.name ||
+        (threadId === 1 ? "General" : `Тема ${threadId}`)
+
+      await upsertChatTopic({
+        id: threadId,
+        chatId,
+        name: topicName,
+        iconColor: message.forum_topic_created?.icon_color,
+        iconCustomEmojiId: message.forum_topic_created?.icon_custom_emoji_id
+          ? Number(message.forum_topic_created.icon_custom_emoji_id)
+          : message.forum_topic_edited?.icon_custom_emoji_id
+          ? Number(message.forum_topic_edited.icon_custom_emoji_id)
+          : undefined,
+      })
     }
 
     if (message?.forum_topic_created && message.message_thread_id && message.chat?.id) {
