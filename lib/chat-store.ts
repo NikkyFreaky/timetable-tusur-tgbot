@@ -245,6 +245,14 @@ export async function upsertChatTopic(topic: {
 }): Promise<ChatTopic> {
   const now = new Date().toISOString()
 
+  console.log("=== upsertChatTopic called ===", {
+    topicId: topic.id,
+    chatId: topic.chatId,
+    name: topic.name,
+    iconColor: topic.iconColor,
+    iconCustomEmojiId: topic.iconCustomEmojiId,
+  })
+
   const { data: existing } = await supabase
     .from("chat_topics")
     .select()
@@ -252,7 +260,10 @@ export async function upsertChatTopic(topic: {
     .eq("chat_id", topic.chatId)
     .single()
 
+  console.log("Existing topic check:", existing)
+
   if (existing) {
+    console.log("Updating existing topic...")
     await supabase
       .from("chat_topics")
       .update({
@@ -264,15 +275,26 @@ export async function upsertChatTopic(topic: {
       .eq("id", topic.id)
       .eq("chat_id", topic.chatId)
   } else {
-    await supabase.from("chat_topics").insert({
-      id: topic.id,
-      chat_id: topic.chatId,
-      name: topic.name,
-      icon_color: topic.iconColor ?? null,
-      icon_custom_emoji_id: topic.iconCustomEmojiId ?? null,
-      created_at: now,
-      updated_at: now,
-    })
+    console.log("Inserting new topic...")
+    const { error: insertError } = await supabase
+      .from("chat_topics")
+      .insert({
+        id: topic.id,
+        chat_id: topic.chatId,
+        name: topic.name,
+        icon_color: topic.iconColor ?? null,
+        icon_custom_emoji_id: topic.iconCustomEmojiId ?? null,
+        created_at: now,
+        updated_at: now,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error("Failed to insert topic:", insertError)
+    } else {
+      console.log("Topic inserted successfully")
+    }
   }
 
   return {

@@ -236,6 +236,13 @@ export async function POST(request: Request) {
 
     if (update.forum_topic_created) {
       const { name, icon_color, icon_custom_emoji_id, thread_id } = update.forum_topic_created
+      console.log("=== forum_topic_created event ===", {
+        chatId,
+        thread_id,
+        name,
+        icon_color,
+        icon_custom_emoji_id,
+      })
       await upsertChatTopic({
         id: thread_id,
         chatId: chatId,
@@ -243,6 +250,7 @@ export async function POST(request: Request) {
         iconColor: icon_color,
         iconCustomEmojiId: icon_custom_emoji_id ? Number(icon_custom_emoji_id) : undefined,
       })
+      console.log("Topic created/updated in database")
     }
 
     if (update.forum_topic_edited) {
