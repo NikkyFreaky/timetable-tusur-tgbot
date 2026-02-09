@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ChevronRight, GraduationCap, Bell, Clock, RotateCcw, Check, ChevronDown, Users, AlertCircle } from "lucide-react"
+import { ChevronRight, GraduationCap, Bell, Clock, RotateCcw, Check, ChevronDown, Users, AlertCircle, RefreshCw } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -424,6 +424,37 @@ export function SettingsPanel({
           setIsLoadingTopics(false)
         }
       })
+  }
+
+  const handleSyncChatInfo = async (chatId: number) => {
+    if (!userId) return
+
+    console.log("Syncing chat info for:", chatId)
+
+    try {
+      const response = await fetch(`/api/chats/${chatId}/sync-info`, {
+        method: "POST",
+      })
+
+      console.log("Sync chat info response status:", response.status)
+
+      if (!response.ok) {
+        throw new Error("Не удалось обновить информацию о чате")
+      }
+
+      const data = await response.json()
+      console.log("Chat synced:", data.chat)
+
+      hapticFeedback("success")
+
+      // Reload topics
+      if (selectedChatId === chatId) {
+        handleChatSelect(chatId)
+      }
+    } catch (error) {
+      console.error("Failed to sync chat info:", error)
+      hapticFeedback("error")
+    }
   }
 
   const handleUpdateTopic = async (topicId: number | null) => {
@@ -893,9 +924,22 @@ export function SettingsPanel({
                     <>
                       {/* Chat Selection */}
                       <div className="px-4 mb-6">
-                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                          Группа
-                        </h3>
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Группа
+                          </h3>
+                          {selectedChatId && (
+                            <button
+                              type="button"
+                              onClick={() => handleSyncChatInfo(selectedChatId)}
+                              className="flex items-center gap-1 text-xs text-primary hover:opacity-70 transition-opacity"
+                              title="Обновить информацию о чате"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Обновить
+                            </button>
+                          )}
+                        </div>
                         <div className="relative">
                           <select
                             value={selectedChatId || ""}

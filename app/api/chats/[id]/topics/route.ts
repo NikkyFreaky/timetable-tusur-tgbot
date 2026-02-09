@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { getChatById, listChatTopics, getChatMemberRole } from "@/lib/chat-store"
-import { isAdmin } from "@/lib/telegram-api"
+import { getChatById, listChatTopics, getChatMemberRole, upsertChat } from "@/lib/chat-store"
+import { isAdmin, getChat } from "@/lib/telegram-api"
 
 export const runtime = "nodejs"
 
@@ -20,13 +20,52 @@ export async function GET(
       return NextResponse.json({ error: "Invalid chat id" }, { status: 400 })
     }
 
-    const chat = await getChatById(chatId)
+    let chat = await getChatById(chatId)
     if (!chat) {
       console.log("Chat not found:", chatId)
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
     console.log("Chat found:", { id: chat.id, title: chat.title, isForum: chat.isForum, topicId: chat.topicId })
+
+    // Check and update is_forum via Telegram API if needed
+    const botToken = process.env.BOT_TOKEN
+    if (botToken && chatId < 0) { // Only for group chats (negative IDs)
+      console.log("Fetching chat info from Telegram API...")
+      const telegramChat = await getChat(botToken, chatId)
+      console.log("Telegram API chat info:", telegramChat)
+
+      if (telegramChat) {
+        const telegramIsForum = telegramChat.is_forum ?? false
+        console.log("Telegram is_forum:", telegramIsForum, "DB isForum:", chat.isForum)
+
+        // Update if mismatch
+        if (telegramIsForum !== chat.isForum) {
+          console.log("Updating is_forum in database...")
+          await upsertChat({
+            chat: {
+              id: chatId,
+              type: chat.type,
+              title: chat.title || undefined,
+              username: chat.username || undefined,
+              photo_url: chat.photoUrl || undefined,
+            },
+            isForum: telegramIsForum,
+          })
+
+          // Reload chat with updated data
+          const updatedChat = await getChatById(chatId)
+          if (updatedChat) {
+            chat = updatedChat
+            console.log("Updated chat:", chat)
+          }
+        }
+      }
+    }
+
+    if (!chat) {
+      return NextResponse.json({ error: "Chat not found" }, { status: 404 })
+    }
 
     const userIdHeader = request.headers.get("x-user-id")
     if (!userIdHeader) {
