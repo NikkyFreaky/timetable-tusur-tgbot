@@ -135,10 +135,6 @@ export async function POST(request: Request) {
               console.log("Admin synced:", chatId, admin.user.id, role)
             }
           }
-
-          await sendTelegramMessage(botToken, chatId,
-            "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
-          )
         } else {
           console.log("Member added to chat:", chatId, "member:", member.id)
           const memberInfo = await getChatMember(botToken, chatId, member.id)
@@ -166,8 +162,11 @@ export async function POST(request: Request) {
     }
 
     if (update.my_chat_member) {
-      const { chat, new_chat_member } = update.my_chat_member
+      const { chat, old_chat_member, new_chat_member } = update.my_chat_member
       const newRole = getRoleFromStatus(new_chat_member.status as any)
+      const isActivationTransition =
+        (old_chat_member.status === "left" || old_chat_member.status === "kicked") &&
+        (new_chat_member.status === "member" || new_chat_member.status === "administrator")
 
       if (new_chat_member.status === "left" || new_chat_member.status === "kicked") {
         await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
@@ -194,9 +193,13 @@ export async function POST(request: Request) {
           }
         }
 
-        await sendTelegramMessage(botToken, chat.id,
-          "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы."
-        )
+        if (isActivationTransition) {
+          await sendTelegramMessage(
+            botToken,
+            chat.id,
+            "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы. Для корректной работы выдайте боту права администратора в группе."
+          )
+        }
       }
     }
 
