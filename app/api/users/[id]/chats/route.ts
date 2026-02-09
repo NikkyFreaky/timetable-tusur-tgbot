@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { listUserChats } from "@/lib/chat-store"
+import { getChat } from "@/lib/telegram-api"
 
 export const runtime = "nodejs"
 
@@ -18,8 +19,26 @@ export async function GET(
     }
 
     const chats = await listUserChats(userId)
+    const botToken = process.env.BOT_TOKEN
 
-    return NextResponse.json({ chats })
+    if (!botToken || chats.length === 0) {
+      return NextResponse.json({ chats })
+    }
+
+    const activeChats = []
+    for (const chat of chats) {
+      if (chat.type === "private") {
+        activeChats.push(chat)
+        continue
+      }
+
+      const telegramChat = await getChat(botToken, chat.id)
+      if (telegramChat) {
+        activeChats.push(chat)
+      }
+    }
+
+    return NextResponse.json({ chats: activeChats })
   } catch (error) {
     console.error("Failed to load user chats:", error)
     return NextResponse.json({ error: "Failed to load user chats" }, { status: 500 })
