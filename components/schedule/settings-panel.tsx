@@ -309,7 +309,13 @@ export function SettingsPanel({
         }
         const data = await response.json()
         if (!cancelled) {
-          setChats(data.chats || [])
+          const loadedChats = data.chats || []
+          setChats(loadedChats)
+
+          // Auto-select first chat
+          if (loadedChats.length > 0) {
+            handleChatSelect(loadedChats[0].id)
+          }
         }
       })
       .catch((error) => {
@@ -331,6 +337,8 @@ export function SettingsPanel({
   const handleChatSelect = (chatId: number) => {
     const chat = chats.find((c) => c.id === chatId)
     if (!chat) return
+
+    console.log("handleChatSelect called:", chatId, chat)
 
     hapticFeedback("selection")
     setSelectedChatId(chatId)
@@ -357,12 +365,17 @@ export function SettingsPanel({
     setTempGroupFacultySlug(chat.settings?.facultySlug || null)
     setTempGroupCourse(chat.settings?.course || null)
 
-    if (!userId) return
+    if (!userId) {
+      console.log("No userId, skipping topic load")
+      return
+    }
 
     let cancelled = false
     setIsLoadingTopics(true)
     setTopicsError(null)
     setUserRole(null)
+
+    console.log("Loading topics for chat:", chatId, "userId:", userId)
 
     fetch(`/api/chats/${chatId}/topics`, {
       headers: {
@@ -370,7 +383,9 @@ export function SettingsPanel({
       },
     })
       .then(async (response) => {
+        console.log("Topics response status:", response.status)
         if (response.status === 403) {
+          console.log("User is not admin, role: member")
           setUserRole("member")
           setTopicsError("У вас нет прав администратора")
           return
@@ -379,12 +394,14 @@ export function SettingsPanel({
           throw new Error("Не удалось загрузить темы")
         }
         const data = await response.json()
+        console.log("Topics loaded:", data.topics)
         if (!cancelled) {
           setTopics(data.topics || [])
           setUserRole("administrator")
         }
       })
       .catch((error) => {
+        console.error("Failed to load topics:", error)
         if (!cancelled) {
           setTopicsError(error instanceof Error ? error.message : "Не удалось загрузить темы")
         }
@@ -397,7 +414,12 @@ export function SettingsPanel({
   }
 
   const handleUpdateTopic = async (topicId: number | null) => {
-    if (!selectedChatId || !userId) return
+    if (!selectedChatId || !userId) {
+      console.log("handleUpdateTopic called without selectedChatId or userId")
+      return
+    }
+
+    console.log("Updating topic:", topicId, "for chat:", selectedChatId)
 
     hapticFeedback("selection")
     setSelectedTopicId(topicId)
@@ -412,9 +434,16 @@ export function SettingsPanel({
         body: JSON.stringify({ topicId }),
       })
 
+      console.log("Topic update response status:", response.status)
+
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Failed to update topic:", response.status, errorText)
         throw new Error("Не удалось обновить тему")
       }
+
+      const responseData = await response.json()
+      console.log("Topic updated successfully:", responseData)
 
       if (selectedChat) {
         setSelectedChat({ ...selectedChat, topicId })
@@ -425,9 +454,14 @@ export function SettingsPanel({
   }
 
   const handleUpdateGroupSettings = async (updates: Partial<UserSettings>) => {
-    if (!selectedChatId || !userId) return
+    if (!selectedChatId || !userId) {
+      console.log("handleUpdateGroupSettings called without selectedChatId or userId")
+      return
+    }
 
     const newSettings = { ...tempGroupSettings, ...updates }
+    console.log("Updating group settings:", updates)
+    console.log("New settings:", newSettings)
     setTempGroupSettings(newSettings)
 
     try {
@@ -440,9 +474,16 @@ export function SettingsPanel({
         body: JSON.stringify({ settings: updates }),
       })
 
+      console.log("Settings update response status:", response.status)
+
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Failed to update settings:", response.status, errorText)
         throw new Error("Не удалось сохранить настройки")
       }
+
+      const responseData = await response.json()
+      console.log("Settings updated successfully:", responseData)
 
       if (selectedChat) {
         setSelectedChat({ ...selectedChat, settings: newSettings })
@@ -456,13 +497,13 @@ export function SettingsPanel({
     hapticFeedback("selection")
     setTempGroupFacultySlug(facultySlug)
     setTempGroupCourse(null)
-    setGroupView("faculty")
+    setGroupView("course")
   }
 
   const handleSelectGroupCourseForChat = (course: number) => {
     hapticFeedback("selection")
     setTempGroupCourse(course)
-    setGroupView("course")
+    setGroupView("group")
   }
 
   const handleSelectGroupForChat = (group: GroupOption) => {
@@ -494,6 +535,23 @@ export function SettingsPanel({
   useEffect(() => {
     groupLatestTimeParts.current = groupTimeParts
   }, [groupTimeParts.hour, groupTimeParts.minute])
+
+  useEffect(() => {
+    if (groupView !== "time") return
+    setTimeout(() => {
+      const hourRef = groupHourScrollRef.current
+      const minuteRef = groupMinuteScrollRef.current
+      if (hourRef) snapWheelScroll(hourRef, groupTimeParts.hour, 23)
+      if (minuteRef) snapWheelScroll(minuteRef, groupTimeParts.minute, 59)
+    }, 100)
+  }, [groupView, groupTimeParts.hour, groupTimeParts.minute])
+
+  useEffect(() => {
+    return () => {
+      if (groupHourScrollTimeout.current) clearTimeout(groupHourScrollTimeout.current)
+      if (groupMinuteScrollTimeout.current) clearTimeout(groupMinuteScrollTimeout.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) {
@@ -1301,14 +1359,14 @@ export function SettingsPanel({
                           className="h-full overflow-y-auto snap-y snap-mandatory scrollbar-none"
                           style={{ paddingBlock: WHEEL_ITEM_HEIGHT * 2 }}
                         >
-                          {hours.map((hour) => (
+                           {hours.map((hour) => (
                             <button
                               key={hour}
                               type="button"
                               onClick={() => {
                                 hapticFeedback("selection")
                                 handleUpdateGroupSettings({
-                                  notificationTime: buildNotificationTime(groupTimeParts.minute, hour),
+                                  notificationTime: buildNotificationTime(hour, groupTimeParts.minute),
                                 })
                               }}
                               className={cn(
