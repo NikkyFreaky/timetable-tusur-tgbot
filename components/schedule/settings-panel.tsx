@@ -1,11 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ChevronRight, GraduationCap, Bell, Clock, RotateCcw, Check } from "lucide-react"
+import { ChevronRight, GraduationCap, Bell, Clock, RotateCcw, Check, ChevronDown, Users, AlertCircle } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import type { UserSettings } from "@/lib/schedule-types"
+import type { StoredChat } from "@/lib/chat-store"
+import type { ChatTopic } from "@/lib/schedule-types"
 import { useTelegram } from "@/lib/telegram-context"
 import type { CourseOption, FacultyOption, GroupOption } from "@/lib/timetable-types"
 
@@ -16,9 +19,11 @@ interface SettingsPanelProps {
   onUpdateSettings: (updates: Partial<UserSettings>) => void
   onResetSettings: () => void
   scopeLabel?: string | null
+  userId?: number
 }
 
 type SettingsView = "main" | "faculty" | "course" | "group" | "time"
+type SettingsTab = "personal" | "groups"
 
 const MASTER_GROUP_PATTERN = /(?:\u041C|\u043C|M|m)/
 const COURSE_BADGE_STYLES = [
@@ -54,9 +59,11 @@ export function SettingsPanel({
   onUpdateSettings,
   onResetSettings,
   scopeLabel,
+  userId,
 }: SettingsPanelProps) {
   const { hapticFeedback } = useTelegram()
   const [view, setView] = useState<SettingsView>("main")
+  const [activeTab, setActiveTab] = useState<SettingsTab>("personal")
   const [tempFacultySlug, setTempFacultySlug] = useState<string | null>(settings.facultySlug)
   const [tempCourse, setTempCourse] = useState<number | null>(settings.course)
   const [faculties, setFaculties] = useState<FacultyOption[]>([])
@@ -70,6 +77,44 @@ export function SettingsPanel({
   const hourScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minuteScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestTimeParts = useRef(parseNotificationTime(settings.notificationTime))
+  
+  // Group settings state
+  const [chats, setChats] = useState<StoredChat[]>([])
+  const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
+  const [selectedChat, setSelectedChat] = useState<StoredChat | null>(null)
+  const [topics, setTopics] = useState<ChatTopic[]>([])
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null)
+  const [userRole, setUserRole] = useState<"creator" | "administrator" | "member" | null>(null)
+  const [isLoadingChats, setIsLoadingChats] = useState(false)
+  const [isLoadingTopics, setIsLoadingTopics] = useState(false)
+  const [chatsError, setChatsError] = useState<string | null>(null)
+  const [topicsError, setTopicsError] = useState<string | null>(null)
+  const [groupView, setGroupView] = useState<SettingsView>("main")
+  const [tempGroupFacultySlug, setTempGroupFacultySlug] = useState<string | null>(null)
+  const [tempGroupCourse, setTempGroupCourse] = useState<number | null>(null)
+  const [tempGroupSettings, setTempGroupSettings] = useState<UserSettings>({
+    facultySlug: null,
+    facultyName: null,
+    groupSlug: null,
+    groupName: null,
+    course: null,
+    weekType: "odd",
+    notificationsEnabled: true,
+    notificationTime: "07:00",
+    sendDayBefore: false,
+    sendDayOf: true,
+    notifyNoLessons: true,
+    notifyHolidays: false,
+    notifyVacations: false,
+    notifyWeekStart: false,
+    notifyHolidayDay: false,
+    theme: "system",
+  })
+  const groupHourScrollRef = useRef<HTMLDivElement | null>(null)
+  const groupMinuteScrollRef = useRef<HTMLDivElement | null>(null)
+  const groupHourScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const groupMinuteScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const groupLatestTimeParts = useRef(parseNotificationTime(tempGroupSettings.notificationTime))
 
   const selectedFacultyName = settings.facultyName
   const selectedGroupName = settings.groupName

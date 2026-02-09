@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Calendar, Settings, Sparkles, Users } from "lucide-react"
+import { Calendar, Settings, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DAY_NAMES, type DaySchedule } from "@/lib/schedule-types"
 import {
@@ -22,8 +22,6 @@ import { DaySelector } from "./day-selector"
 import { DayView } from "./day-view"
 import { UpcomingClasses } from "./upcoming-classes"
 import { SettingsPanel } from "./settings-panel"
-import { GroupSettingsPanel } from "./group-settings-panel"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const buildEmptySchedule = (): DaySchedule[] =>
   DAY_NAMES.map((name, index) => ({
@@ -103,8 +101,6 @@ export function ScheduleApp() {
   const [isScheduleLoading, setIsScheduleLoading] = useState(false)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [apiWeekType, setApiWeekType] = useState<"even" | "odd" | null>(null)
-  const [activeTab, setActiveTab] = useState<"schedule" | "groups">("schedule")
-  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false)
   
   const isPrivateChat = chat?.type === "private"
   const isGroupChat = chat?.type === "group" || chat?.type === "supergroup"
@@ -247,217 +243,13 @@ export function ScheduleApp() {
             type="button"
             onClick={() => {
               hapticFeedback("light")
-              if (activeTab === "groups") {
-                setGroupSettingsOpen(true)
-              } else {
-                setSettingsOpen(true)
-              }
+              setSettingsOpen(true)
             }}
             className="p-2 rounded-full hover:bg-accent active:bg-accent/70 transition-colors"
           >
             <Settings className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
-
-        {/* Tabs - only show in private chats */}
-        {!isGroupChat && (
-          <div className="px-4 pb-3">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schedule" | "groups")}>
-              <TabsList className="w-full">
-                <TabsTrigger value="schedule" className="flex-1">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Расписание
-                </TabsTrigger>
-                <TabsTrigger value="groups" className="flex-1">
-                  <Users className="h-4 w-4 mr-2" />
-                  Группы
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="schedule">
-                {/* Все что сейчас для "Расписание": WeekToggle, Week Navigation, View Mode Toggle, Main Content */}
-                <WeekToggle
-                  weekType={weekType}
-                  monday={selectedMonday}
-                  isCurrentWeek={isCurrentWeek}
-                  onPrevWeek={handlePrevWeek}
-                  onNextWeek={handleNextWeek}
-                  onGoToToday={handleGoToToday}
-                />
-
-                <div className="px-4 pb-3">
-                  <WeekToggle
-                    weekType={weekType}
-                    monday={selectedMonday}
-                    isCurrentWeek={isCurrentWeek}
-                    onPrevWeek={handlePrevWeek}
-                    onNextWeek={handleNextWeek}
-                    onGoToToday={handleGoToToday}
-                  />
-                </div>
-
-                <div className="flex border-t border-border">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      hapticFeedback("selection")
-                      setViewMode("day")
-                    }}
-                    className={cn(
-                      "flex-1 py-2.5 text-sm font-medium transition-colors",
-                      viewMode === "day"
-                        ? "text-primary border-b-2 border-primary"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    По дням
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      hapticFeedback("selection")
-                      setViewMode("upcoming")
-                    }}
-                    className={cn(
-                      "flex-1 py-2.5 text-sm font-medium transition-colors",
-                      viewMode === "upcoming"
-                        ? "text-primary border-b-2 border-primary"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    Ближайшие
-                  </button>
-                </div>
-
-                <main className="flex-1 overflow-y-auto">
-                  {viewMode === "day" ? (
-                    <>
-                      {/* Day Selector with Dates */}
-                      <DaySelector
-                        selectedDay={selectedDay}
-                        onSelect={setSelectedDay}
-                        currentDay={currentDayIndex}
-                        hasLessons={hasLessons}
-                        weekDates={weekDates}
-                        isCurrentWeek={isCurrentWeek}
-                      />
-
-                      {scheduleError ? (
-                        <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
-                      ) : isScheduleLoading ? (
-                        <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
-                      ) : null}
-
-                      {/* Day Header */}
-                      <div className="px-4 py-3 border-b border-border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h2 className="font-semibold text-foreground">{DAY_NAMES[selectedDay]}</h2>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDayDate(selectedDate)}
-                              {isToday && " • Сегодня"}
-                            </p>
-                          </div>
-                          {specialPeriod && (
-                            <span className={cn(
-                              "text-xs px-2 py-1 rounded-full border border-transparent",
-                              isNewYearHoliday &&
-                                "border-amber-200/70 bg-gradient-to-r from-amber-200/70 via-rose-200/60 to-sky-200/70 text-amber-700",
-                              !isNewYearHoliday &&
-                                specialPeriod.type === "holiday" &&
-                                "bg-red-500/10 text-red-600 dark:text-red-400",
-                              specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                              specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
-                            )}>
-                              {isNewYearHoliday && "Новогодние"}
-                              {specialPeriod.type === "holiday" && !isNewYearHoliday && "Выходной"}
-                              {specialPeriod.type === "exam" && "Сессия"}
-                              {specialPeriod.type === "vacation" && "Каникулы"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Schedule */}
-                      <DayView
-                        schedule={selectedDaySchedule}
-                        specialPeriod={specialPeriod}
-                        currentTime={currentTime}
-                        isToday={isToday}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      {/* Today's Date */}
-                      <div className="px-4 py-4 border-b border-border">
-                        <p className="text-sm text-muted-foreground capitalize">{formatDate(today)}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {weekType === "even" ? "Чётная" : "Нечётная"} неделя
-                        </p>
-                      </div>
-
-                      {scheduleError ? (
-                        <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
-                      ) : isScheduleLoading ? (
-                        <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
-                      ) : null}
-
-                      {/* Special Period Notice */}
-                      {specialPeriod && (
-                        <div className={cn(
-                          "mx-4 mt-4 p-3 rounded-xl text-sm border border-transparent",
-                          isNewYearHoliday &&
-                            "border-amber-200/70 bg-gradient-to-br from-amber-100/70 via-rose-100/60 to-sky-100/70 text-amber-700",
-                          !isNewYearHoliday &&
-                            specialPeriod.type === "holiday" &&
-                            "bg-red-500/10 text-red-600 dark:text-red-400",
-                          specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                          specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
-                        )}>
-                          <div className="flex items-start gap-2">
-                            {isNewYearHoliday && <Sparkles className="h-4 w-4 mt-0.5" />}
-                            <div>
-                              <strong>{specialPeriod.name}</strong>
-                              <span
-                                className={cn(
-                                  "ml-2",
-                                  isNewYearHoliday ? "text-amber-700/80" : "text-muted-foreground"
-                                )}
-                              >
-                                {specialPeriod.type === "holiday" && "• Выходной"}
-                                {specialPeriod.type === "exam" && "• Сессия"}
-                                {specialPeriod.type === "vacation" && "• Каникулы"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Upcoming Classes */}
-                      <UpcomingClasses
-                        schedule={schedule}
-                        currentDayIndex={currentDayIndex}
-                        weekDates={weekDates}
-                        isCurrentWeek={isCurrentWeek}
-                        currentTime={currentTime}
-                        onViewDay={handleViewDay}
-                      />
-                    </>
-                  )}
-                </main>
-              </TabsContent>
-
-              <TabsContent value="groups">
-                {/* Контент для "Группы": GroupSettingsPanel */}
-                <GroupSettingsPanel
-                  userId={user.id}
-                  isOpen={groupSettingsOpen}
-                  onOpenChange={setGroupSettingsOpen}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
 
         {/* Week Navigation - only show in private chats */}
         {!isGroupChat && (
@@ -654,15 +446,6 @@ export function ScheduleApp() {
         onResetSettings={resetSettings}
         scopeLabel={scopeLabel}
       />
-
-      {/* Group Settings Panel */}
-      {user?.id && (
-        <GroupSettingsPanel
-          userId={user.id}
-          isOpen={groupSettingsOpen}
-          onOpenChange={setGroupSettingsOpen}
-        />
-      )}
     </div>
   )
 }
