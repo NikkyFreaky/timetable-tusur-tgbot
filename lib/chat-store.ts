@@ -207,14 +207,21 @@ export async function updateChatMemberRole(
 }
 
 export async function listChatTopics(chatId: number): Promise<ChatTopic[]> {
+  console.log("=== listChatTopics called ===", { chatId })
+
   const { data: topics } = await supabase
     .from("chat_topics")
     .select()
     .eq("chat_id", chatId)
 
-  if (!topics) return []
+  console.log("Topics from database:", topics)
 
-  return topics.map((t: any) => ({
+  if (!topics) {
+    console.log("No topics found")
+    return []
+  }
+
+  const mappedTopics = topics.map((t: any) => ({
     id: t.id,
     chatId: t.chat_id,
     name: t.name,
@@ -223,6 +230,10 @@ export async function listChatTopics(chatId: number): Promise<ChatTopic[]> {
     createdAt: t.created_at,
     updatedAt: t.updated_at,
   }))
+
+  console.log("Mapped topics:", mappedTopics)
+
+  return mappedTopics
 }
 
 export async function upsertChatTopic(topic: {

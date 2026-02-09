@@ -302,29 +302,31 @@ export function SettingsPanel({
     setUserRole(null)
     setTopicsError(null)
 
+    console.log("=== Loading user chats ===", { userId })
+
     fetch(`/api/users/${userId}/chats`)
       .then(async (response) => {
+        console.log("Chats response status:", response.status)
         if (!response.ok) {
           throw new Error("Не удалось загрузить чаты")
         }
         const data = await response.json()
+        console.log("Chats loaded:", data)
         if (!cancelled) {
           const loadedChats = data.chats || []
+          console.log("Setting chats:", loadedChats)
           setChats(loadedChats)
-
-          // Auto-select first chat
-          if (loadedChats.length > 0) {
-            handleChatSelect(loadedChats[0].id)
-          }
         }
       })
       .catch((error) => {
+        console.error("Failed to load chats:", error)
         if (!cancelled) {
           setChatsError(error instanceof Error ? error.message : "Не удалось загрузить чаты")
         }
       })
       .finally(() => {
         if (!cancelled) {
+          console.log("Finished loading chats")
           setIsLoadingChats(false)
         }
       })
@@ -333,6 +335,14 @@ export function SettingsPanel({
       cancelled = true
     }
   }, [open, activeTab, userId])
+
+  // Auto-select first chat after chats are loaded
+  useEffect(() => {
+    if (chats.length > 0 && !selectedChatId && !isLoadingChats) {
+      console.log("Auto-selecting first chat:", chats[0])
+      handleChatSelect(chats[0].id)
+    }
+  }, [chats, selectedChatId, isLoadingChats])
 
   const handleChatSelect = (chatId: number) => {
     const chat = chats.find((c) => c.id === chatId)
