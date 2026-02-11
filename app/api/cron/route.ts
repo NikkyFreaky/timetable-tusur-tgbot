@@ -85,11 +85,20 @@ function formatDayName(date: Date): string {
 
 function formatLessonLine(lesson: DaySchedule["lessons"][number], index: number) {
   const typeLabel = LESSON_TYPES[lesson.type]?.label
-  const room = lesson.room && lesson.room !== "—" ? `, ауд. ${lesson.room}` : ""
-  const instructor =
-    lesson.instructor && lesson.instructor !== "—" ? `, ${lesson.instructor}` : ""
-  const typePart = typeLabel ? ` (${typeLabel})` : ""
-  return `${index + 1}) ${lesson.time}-${lesson.timeEnd} ${lesson.subject}${typePart}${room}${instructor}`
+  const lines: string[] = [
+    `${index + 1}) ${lesson.time}–${lesson.timeEnd}`,
+    `📚 ${lesson.subject}${typeLabel ? ` (${typeLabel})` : ""}`,
+  ]
+
+  if (lesson.room && lesson.room !== "—") {
+    lines.push(`🏫 Ауд.: ${lesson.room}`)
+  }
+
+  if (lesson.instructor && lesson.instructor !== "—") {
+    lines.push(`👨‍🏫 ${lesson.instructor}`)
+  }
+
+  return lines.join("\n")
 }
 
 function buildScheduleMessage(
@@ -100,16 +109,23 @@ function buildScheduleMessage(
 ) {
   const dateLabel = formatDayDate(date)
   const dayName = formatDayName(date)
-  const lines: string[] = [`${titlePrefix} - ${dateLabel} (${dayName})`]
+  const emoji = titlePrefix === "Расписание на завтра" ? "⏭️" : "📅"
+  const lines: string[] = [
+    `${emoji} ${titlePrefix} — ${dateLabel} (${dayName})`,
+  ]
   if (groupName) {
-    lines.push(`Группа ${groupName}`)
+    lines.push(`👥 Группа: ${groupName}`)
   }
   if (schedule.lessons.length === 0) {
     lines.push("Пар нет.")
     return lines.join("\n")
   }
+  lines.push("")
   schedule.lessons.forEach((lesson, index) => {
     lines.push(formatLessonLine(lesson, index))
+    if (index < schedule.lessons.length - 1) {
+      lines.push("")
+    }
   })
   return lines.join("\n")
 }
@@ -119,7 +135,7 @@ function buildNoLessonsMessage(
   nextSchedule: DaySchedule | null,
   groupName: string | null
 ) {
-  const lines: string[] = ["Сегодня пар нет."]
+  const lines: string[] = ["😌 Сегодня пар нет."]
   if (!nextDate || !nextSchedule) {
     lines.push("Ближайшие занятия не найдены.")
     return lines.join("\n")
@@ -127,16 +143,20 @@ function buildNoLessonsMessage(
 
   const dateLabel = formatDayDate(nextDate)
   const dayName = formatDayName(nextDate)
-  lines.push(`Ближайшие занятия: ${dateLabel} (${dayName})`)
+  lines.push(`📌 Ближайшие занятия — ${dateLabel} (${dayName})`)
   if (groupName) {
-    lines.push(`Группа ${groupName}`)
+    lines.push(`👥 Группа: ${groupName}`)
   }
   if (nextSchedule.lessons.length === 0) {
     lines.push("Пар нет.")
     return lines.join("\n")
   }
+  lines.push("")
   nextSchedule.lessons.forEach((lesson, index) => {
     lines.push(formatLessonLine(lesson, index))
+    if (index < nextSchedule.lessons.length - 1) {
+      lines.push("")
+    }
   })
   return lines.join("\n")
 }
@@ -188,7 +208,7 @@ function shouldSendForTime(now: Date, notificationTime: string) {
 function buildWeekStartMessage(date: Date) {
   const weekType = getWeekType(date) === "even" ? "Чётная" : "Нечётная"
   const dateLabel = formatDayDate(date)
-  return `Начало недели - ${dateLabel}\n${weekType} неделя`
+  return `🗓️ Начало недели — ${dateLabel}\n📊 ${weekType} неделя`
 }
 
 export async function GET(request: Request) {
@@ -344,7 +364,7 @@ export async function GET(request: Request) {
       const todaySpecial = isSpecialPeriod(now, SPECIAL_PERIODS)
       if (settings.notifyHolidayDay && todaySpecial?.type === "holiday") {
         if (recipient.state.lastHolidayDayDate !== todayKey) {
-          messages.unshift(`Сегодня праздник: ${todaySpecial.name}.`)
+          messages.unshift(`🎉 Сегодня праздник: ${todaySpecial.name}`)
           stateUpdates.lastHolidayDayDate = todayKey
         }
       }
@@ -360,7 +380,7 @@ export async function GET(request: Request) {
     ) {
         const noticeKey = `${tomorrowSpecial.id}|${tomorrowKey}`
         if (recipient.state.lastHolidayNoticeKey !== noticeKey) {
-          messages.unshift(`Завтра праздник: ${tomorrowSpecial.name}.`)
+          messages.unshift(`🎉 Завтра праздник: ${tomorrowSpecial.name}`)
           stateUpdates.lastHolidayNoticeKey = noticeKey
         }
       }
@@ -372,7 +392,7 @@ export async function GET(request: Request) {
     ) {
         const noticeKey = `${tomorrowSpecial.id}|${tomorrowKey}`
         if (recipient.state.lastVacationNoticeKey !== noticeKey) {
-          messages.unshift(`Завтра начинаются каникулы: ${tomorrowSpecial.name}.`)
+          messages.unshift(`🏖️ Завтра начинаются каникулы: ${tomorrowSpecial.name}`)
           stateUpdates.lastVacationNoticeKey = noticeKey
         }
       }

@@ -137,7 +137,7 @@ export function SettingsPanel({
     fetch("/api/faculties")
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Failed to load faculties")
+          throw new Error("⚠️ Не удалось загрузить факультеты. Попробуйте ещё раз чуть позже.")
         }
         const data = (await response.json()) as { faculties: FacultyOption[] }
         if (!cancelled) {
@@ -146,7 +146,7 @@ export function SettingsPanel({
       })
       .catch((error) => {
         if (!cancelled) {
-          setFacultiesError(error instanceof Error ? error.message : "Failed to load faculties")
+          setFacultiesError(error instanceof Error ? error.message : "⚠️ Не удалось загрузить факультеты. Попробуйте ещё раз чуть позже.")
         }
       })
       .finally(() => {
@@ -253,7 +253,7 @@ export function SettingsPanel({
     fetch(`/api/faculties/${missingFacultySlug}/courses`)
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error("Failed to load courses")
+          throw new Error("⚠️ Не удалось загрузить курсы. Попробуйте ещё раз чуть позже.")
         }
         const data = (await response.json()) as { courses: CourseOption[] }
         if (!cancelled) {
@@ -265,7 +265,7 @@ export function SettingsPanel({
       })
       .catch((error) => {
         if (!cancelled) {
-          setCoursesError(error instanceof Error ? error.message : "Failed to load courses")
+          setCoursesError(error instanceof Error ? error.message : "⚠️ Не удалось загрузить курсы. Попробуйте ещё раз чуть позже.")
         }
       })
       .finally(() => {
@@ -327,7 +327,7 @@ export function SettingsPanel({
       .catch((error) => {
         console.error("Failed to load chats:", error)
         if (!cancelled) {
-          setChatsError(error instanceof Error ? error.message : "Не удалось загрузить чаты")
+          setChatsError(error instanceof Error ? error.message : "⚠️ Не удалось загрузить чаты. Попробуйте ещё раз чуть позже.")
         }
       })
       .finally(() => {
@@ -419,7 +419,7 @@ export function SettingsPanel({
       .catch((error) => {
         console.error("Failed to load topics:", error)
         if (!cancelled) {
-          setTopicsError(error instanceof Error ? error.message : "Не удалось загрузить темы")
+          setTopicsError(error instanceof Error ? error.message : "⚠️ Не удалось загрузить темы. Попробуйте ещё раз чуть позже.")
         }
       })
       .finally(() => {

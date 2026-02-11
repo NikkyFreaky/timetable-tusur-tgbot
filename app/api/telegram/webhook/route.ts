@@ -90,9 +90,9 @@ function getCommand(text: string | undefined) {
 
 export async function POST(request: Request) {
   const botToken = process.env.BOT_TOKEN
-  const webAppUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_WEBAPP_URL
+  const miniAppUrl = process.env.MINI_APP_URL
 
-  if (!botToken || !webAppUrl) {
+  if (!botToken || !miniAppUrl) {
     return NextResponse.json({ ok: false })
   }
 
@@ -107,9 +107,9 @@ export async function POST(request: Request) {
       const command = getCommand(message.text)
 
       if (command === "/start" || command === "/settings") {
-        const text = "Откройте веб-приложение, чтобы выбрать группу и настроить уведомления."
+        const text = "⚙️ Настройка уведомлений\nОткройте веб-приложение, выберите группу и включите нужные рассылки."
         await sendTelegramMessage(botToken, chatId, text, {
-          replyMarkup: buildWebAppKeyboard(webAppUrl),
+          replyMarkup: buildWebAppKeyboard(miniAppUrl),
         })
       }
 
@@ -135,6 +135,12 @@ export async function POST(request: Request) {
               console.log("Admin synced:", chatId, admin.user.id, role)
             }
           }
+
+          // Send welcome message with Mini App button
+          const welcomeText = `✅ Бот добавлен в группу!\n\n📖 Откройте Mini App, чтобы настроить расписание для этой группы.`
+          await sendTelegramMessage(botToken, chatId, welcomeText, {
+            replyMarkup: buildWebAppKeyboard(miniAppUrl),
+          })
         } else {
           console.log("Member added to chat:", chatId, "member:", member.id)
           const memberInfo = await getChatMember(botToken, chatId, member.id)
@@ -197,7 +203,7 @@ export async function POST(request: Request) {
           await sendTelegramMessage(
             botToken,
             chat.id,
-            "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы. Для корректной работы выдайте боту права администратора в группе."
+            "✅ Чтобы настроить уведомления:\n1) Напишите боту в личные сообщения и откройте веб-приложение\n2) В группе выдайте боту права администратора"
           )
         }
       }
