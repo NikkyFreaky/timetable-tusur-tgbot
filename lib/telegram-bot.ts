@@ -66,11 +66,11 @@ export function buildWebAppKeyboard(miniAppUrl: string) {
   }
 }
 
-export function buildUrlKeyboard(url: string) {
+export function buildUrlKeyboard(miniAppUrl: string) {
   return {
     inline_keyboard: [[{
       text: "📖 Открыть расписание",
-      url
+      url: miniAppUrl
     }]],
   }
 }

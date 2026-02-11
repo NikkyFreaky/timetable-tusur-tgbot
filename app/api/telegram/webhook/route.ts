@@ -91,9 +91,8 @@ function getCommand(text: string | undefined) {
 export async function POST(request: Request) {
   const botToken = process.env.BOT_TOKEN
   const miniAppUrl = process.env.MINI_APP_URL
-  const webAppUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_WEBAPP_URL
 
-  if (!botToken || !miniAppUrl || !webAppUrl) {
+  if (!botToken || !miniAppUrl) {
     return NextResponse.json({ ok: false })
   }
 
@@ -111,7 +110,7 @@ export async function POST(request: Request) {
         console.log("=== Handling command ===", { command, chatId, isGroup, chatType: message.chat.type })
         const text = "⚙️ Настройка уведомлений\nОткройте веб-приложение, выберите группу и включите нужные рассылки."
         await sendTelegramMessage(botToken, chatId, text, {
-          replyMarkup: isGroup ? buildUrlKeyboard(webAppUrl) : buildWebAppKeyboard(miniAppUrl),
+          replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(miniAppUrl),
         })
       }
 
@@ -141,7 +140,7 @@ export async function POST(request: Request) {
           // Send welcome message with Mini App button
           const welcomeText = `✅ Бот добавлен в группу!\n\n📖 Откройте веб-приложение, чтобы настроить расписание для этой группы.`
           await sendTelegramMessage(botToken, chatId, welcomeText, {
-            replyMarkup: buildUrlKeyboard(webAppUrl),
+            replyMarkup: buildUrlKeyboard(miniAppUrl),
           })
         } else {
           console.log("Member added to chat:", chatId, "member:", member.id)
