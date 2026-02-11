@@ -57,11 +57,20 @@ export async function sendTelegramMessage(
   console.log('[Telegram sendMessage] Success')
 }
 
-export function buildWebAppKeyboard(url: string) {
+export function buildWebAppKeyboard(miniAppUrl: string) {
   return {
     inline_keyboard: [[{
-      text: "Открыть расписание",
-      url: url
+      text: "📖 Открыть расписание",
+      web_app: { url: miniAppUrl }
+    }]],
+  }
+}
+
+export function buildUrlKeyboard(miniAppUrl: string) {
+  return {
+    inline_keyboard: [[{
+      text: "📖 Открыть расписание",
+      url: miniAppUrl
     }]],
   }
 }

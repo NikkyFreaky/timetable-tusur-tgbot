@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { buildWebAppKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
+import { buildWebAppKeyboard, buildUrlKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
 import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getForumTopics } from "@/lib/telegram-api"
 import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById, markChatMembersInactive } from "@/lib/chat-store"
 
@@ -91,26 +91,53 @@ function getCommand(text: string | undefined) {
 export async function POST(request: Request) {
   const botToken = process.env.BOT_TOKEN
   const webAppUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_WEBAPP_URL
+  const miniAppUrl = process.env.MINI_APP_URL
 
-  if (!botToken || !webAppUrl) {
-    return NextResponse.json({ ok: false })
+  if (!botToken) {
+    console.error("BOT_TOKEN is not set")
+    return NextResponse.json({ ok: false, error: "BOT_TOKEN missing" }, { status: 500 })
+  }
+  if (!webAppUrl) {
+    console.error("WEBAPP_URL or NEXT_PUBLIC_WEBAPP_URL is not set")
+    return NextResponse.json({ ok: false, error: "WEBAPP_URL missing" }, { status: 500 })
+  }
+  if (!miniAppUrl) {
+    console.error("MINI_APP_URL is not set")
+    return NextResponse.json({ ok: false, error: "MINI_APP_URL missing" }, { status: 500 })
   }
 
   try {
     const update = (await request.json()) as TelegramUpdate
+    console.log("=== Telegram update received ===", { update_id: update.update_id, has_message: !!update.message, has_edited_message: !!update.edited_message, has_my_chat_member: !!update.my_chat_member, has_chat_member: !!update.chat_member })
     const message = update.message ?? update.edited_message
 
     if (message?.chat?.id) {
       const chatId = message.chat.id
       const isGroup = message.chat.type !== "private"
+      console.log("=== Message info ===", { chatId, chatType: message.chat.type, isGroup, text: message.text, has_new_chat_members: !!message.new_chat_members, has_left_chat_member: !!message.left_chat_member })
 
       const command = getCommand(message.text)
 
-      if (command === "/start" || command === "/settings") {
-        const text = "Откройте веб-приложение, чтобы выбрать группу и настроить уведомления."
+      if (command === "/start") {
+        console.log("=== Handling /start command ===", { chatId, isGroup, chatType: message.chat.type, webAppUrl, miniAppUrl })
+        const text = isGroup
+          ? "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) В группе выдайте боту права администратора"
+          : "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) Выберите группу\n3) Включите нужные рассылки"
+        console.log("=== Sending /start message ===", { text, chatId, isGroup, replyMarkupType: isGroup ? "url" : "web_app" })
         await sendTelegramMessage(botToken, chatId, text, {
-          replyMarkup: buildWebAppKeyboard(webAppUrl),
+          replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
         })
+        console.log("=== /start message sent successfully ===")
+      }
+
+      if (command === "/settings") {
+        console.log("=== Handling /settings command ===", { chatId, isGroup, chatType: message.chat.type, webAppUrl, miniAppUrl })
+        const text = "⚙️ Настройка уведомлений\nОткройте веб-приложение, выберите группу и включите нужные рассылки."
+        console.log("=== Sending /settings message ===", { text, chatId, isGroup, replyMarkupType: isGroup ? "url" : "web_app" })
+        await sendTelegramMessage(botToken, chatId, text, {
+          replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
+        })
+        console.log("=== /settings message sent successfully ===")
       }
 
       if (isGroup && message.new_chat_members) {
@@ -126,7 +153,7 @@ export async function POST(request: Request) {
             isForum,
           })
 
-          // Sync all administrators of the group
+          // Sync all administrators of group
           const admins = await getChatAdministrators(botToken, chatId)
           if (admins) {
             for (const admin of admins) {
@@ -135,6 +162,13 @@ export async function POST(request: Request) {
               console.log("Admin synced:", chatId, admin.user.id, role)
             }
           }
+
+          // Send welcome message with Mini App button
+          console.log("=== Bot added to group ===", { chatId, miniAppUrl })
+          const welcomeText = `✅ Бот добавлен в группу!\n\n📖 Откройте веб-приложение, чтобы настроить расписание для этой группы.`
+          await sendTelegramMessage(botToken, chatId, welcomeText, {
+            replyMarkup: buildUrlKeyboard(miniAppUrl),
+          })
         } else {
           console.log("Member added to chat:", chatId, "member:", member.id)
           const memberInfo = await getChatMember(botToken, chatId, member.id)
@@ -193,12 +227,18 @@ export async function POST(request: Request) {
           }
         }
 
-        if (isActivationTransition) {
+        if (isActivationTransition && chat.type === "private") {
+          console.log("=== Bot activated in private chat ===", { chatId: chat.id, webAppUrl })
+          const activationText = "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) В группе выдайте боту права администратора"
           await sendTelegramMessage(
             botToken,
             chat.id,
-            "Перейдите в личные сообщения бота и откройте веб-приложение для настройки уведомлений группы. Для корректной работы выдайте боту права администратора в группе."
+            activationText,
+            {
+              replyMarkup: buildWebAppKeyboard(webAppUrl),
+            }
           )
+          console.log("=== Activation message sent successfully ===")
         }
       }
     }

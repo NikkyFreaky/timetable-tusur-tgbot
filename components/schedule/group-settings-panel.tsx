@@ -67,7 +67,7 @@ export function GroupSettingsPanel({
     try {
       const response = await fetch(`/api/users/${userId}/chats`)
       if (!response.ok) {
-        throw new Error("Failed to load chats")
+        throw new Error("⚠️ Не удалось загрузить чаты. Попробуйте ещё раз чуть позже.")
       }
       const data = await response.json()
       setChats(data.chats || [])
@@ -76,7 +76,7 @@ export function GroupSettingsPanel({
           setSelectedChatId(data.chats[0].id)
         }
       } catch (error) {
-        setChatsError(error instanceof Error ? error.message : "Failed to load chats")
+        setChatsError(error instanceof Error ? error.message : "⚠️ Не удалось загрузить чаты. Попробуйте ещё раз чуть позже.")
       } finally {
         setIsLoadingChats(false)
       }
@@ -113,14 +113,14 @@ export function GroupSettingsPanel({
           setUserRole("member")
           throw new Error("У вас нет прав администратора")
         }
-        throw new Error("Failed to load topics")
+        throw new Error("⚠️ Не удалось загрузить темы. Попробуйте ещё раз чуть позже.")
       }
 
       const data = await response.json()
       setTopics(data.topics || [])
       setUserRole("administrator")
     } catch (error) {
-      setTopicsError(error instanceof Error ? error.message : "Failed to load topics")
+      setTopicsError(error instanceof Error ? error.message : "⚠️ Не удалось загрузить темы. Попробуйте ещё раз чуть позже.")
       setTopics([
         {
           id: null as any,
