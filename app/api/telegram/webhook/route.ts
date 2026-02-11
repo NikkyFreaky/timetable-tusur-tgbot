@@ -122,7 +122,7 @@ export async function POST(request: Request) {
         console.log("=== Handling /start command ===", { chatId, isGroup, chatType: message.chat.type, webAppUrl, miniAppUrl })
         const text = isGroup
           ? "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) В группе выдайте боту права администратора"
-          : "⚙️ Настройка уведомлений\nОткройте веб-приложение, выберите группу и включите нужные рассылки."
+          : "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) Выберите группу\n3) Включите нужные рассылки"
         console.log("=== Sending /start message ===", { text, chatId, isGroup, replyMarkupType: isGroup ? "url" : "web_app" })
         await sendTelegramMessage(botToken, chatId, text, {
           replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
