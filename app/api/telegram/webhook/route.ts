@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { buildWebAppKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
+import { buildWebAppKeyboard, buildUrlKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
 import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getForumTopics } from "@/lib/telegram-api"
 import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById, markChatMembersInactive } from "@/lib/chat-store"
 
@@ -91,8 +91,9 @@ function getCommand(text: string | undefined) {
 export async function POST(request: Request) {
   const botToken = process.env.BOT_TOKEN
   const miniAppUrl = process.env.MINI_APP_URL
+  const webAppUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_WEBAPP_URL
 
-  if (!botToken || !miniAppUrl) {
+  if (!botToken || !miniAppUrl || !webAppUrl) {
     return NextResponse.json({ ok: false })
   }
 
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
       if (command === "/start" || command === "/settings") {
         const text = "⚙️ Настройка уведомлений\nОткройте веб-приложение, выберите группу и включите нужные рассылки."
         await sendTelegramMessage(botToken, chatId, text, {
-          replyMarkup: buildWebAppKeyboard(miniAppUrl),
+          replyMarkup: isGroup ? buildUrlKeyboard(webAppUrl) : buildWebAppKeyboard(miniAppUrl),
         })
       }
 
@@ -137,9 +138,9 @@ export async function POST(request: Request) {
           }
 
           // Send welcome message with Mini App button
-          const welcomeText = `✅ Бот добавлен в группу!\n\n📖 Откройте Mini App, чтобы настроить расписание для этой группы.`
+          const welcomeText = `✅ Бот добавлен в группу!\n\n📖 Откройте веб-приложение, чтобы настроить расписание для этой группы.`
           await sendTelegramMessage(botToken, chatId, welcomeText, {
-            replyMarkup: buildWebAppKeyboard(miniAppUrl),
+            replyMarkup: buildUrlKeyboard(webAppUrl),
           })
         } else {
           console.log("Member added to chat:", chatId, "member:", member.id)
@@ -200,10 +201,14 @@ export async function POST(request: Request) {
         }
 
         if (isActivationTransition) {
+          const activationText = "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) В группе выдайте боту права администратора"
           await sendTelegramMessage(
             botToken,
             chat.id,
-            "✅ Чтобы настроить уведомления:\n1) Напишите боту в личные сообщения и откройте веб-приложение\n2) В группе выдайте боту права администратора"
+            activationText,
+            {
+              replyMarkup: chat.type === "private" ? buildWebAppKeyboard(miniAppUrl) : buildUrlKeyboard(webAppUrl),
+            }
           )
         }
       }
