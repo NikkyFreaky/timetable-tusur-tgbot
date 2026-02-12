@@ -36,6 +36,12 @@ export interface DaySchedule {
   dayName: string
   dayIndex: number
   lessons: Lesson[]
+  specialDay?: TimetableSpecialDay
+}
+
+export interface TimetableSpecialDay {
+  type: "vacation" | "holiday" | "practice"
+  name: string
 }
 
 export interface WeekSchedule {
@@ -78,7 +84,7 @@ export interface UserSettings {
 
 export interface SpecialPeriod {
   id: string
-  type: "holiday" | "exam" | "vacation" | "weekend"
+  type: "holiday" | "exam" | "vacation" | "weekend" | "practice"
   name: string
   startDate: string
   endDate: string
