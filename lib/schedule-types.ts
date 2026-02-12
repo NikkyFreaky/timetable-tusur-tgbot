@@ -36,6 +36,12 @@ export interface DaySchedule {
   dayName: string
   dayIndex: number
   lessons: Lesson[]
+  specialDay?: TimetableSpecialDay
+}
+
+export interface TimetableSpecialDay {
+  type: "vacation"
+  name: string
 }
 
 export interface WeekSchedule {

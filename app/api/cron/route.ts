@@ -211,6 +211,10 @@ function buildWeekStartMessage(date: Date) {
   return `🗓️ Начало недели — ${dateLabel}\n📊 ${weekType} неделя`
 }
 
+function isVacationDay(schedule: DaySchedule) {
+  return schedule.specialDay?.type === "vacation"
+}
+
 export async function GET(request: Request) {
   const botToken = process.env.BOT_TOKEN
   const cronSecret = process.env.CRON_SECRET
@@ -373,11 +377,11 @@ export async function GET(request: Request) {
       const tomorrowKey = formatDateKey(tomorrow)
       const tomorrowSpecial = isSpecialPeriod(tomorrow, SPECIAL_PERIODS)
 
-    if (
-      settings.notifyHolidays &&
-      tomorrowSpecial?.type === "holiday" &&
-      tomorrowKey === tomorrowSpecial.startDate
-    ) {
+      if (
+        settings.notifyHolidays &&
+        tomorrowSpecial?.type === "holiday" &&
+        tomorrowKey === tomorrowSpecial.startDate
+      ) {
         const noticeKey = `${tomorrowSpecial.id}|${tomorrowKey}`
         if (recipient.state.lastHolidayNoticeKey !== noticeKey) {
           messages.unshift(`🎉 Завтра праздник: ${tomorrowSpecial.name}`)
@@ -385,15 +389,21 @@ export async function GET(request: Request) {
         }
       }
 
-    if (
-      settings.notifyVacations &&
-      tomorrowSpecial?.type === "vacation" &&
-      tomorrowKey === tomorrowSpecial.startDate
-    ) {
-        const noticeKey = `${tomorrowSpecial.id}|${tomorrowKey}`
-        if (recipient.state.lastVacationNoticeKey !== noticeKey) {
-          messages.unshift(`🏖️ Завтра начинаются каникулы: ${tomorrowSpecial.name}`)
-          stateUpdates.lastVacationNoticeKey = noticeKey
+      if (settings.notifyVacations) {
+        const tomorrowSchedule = await getScheduleForDate(
+          settings.facultySlug,
+          settings.groupSlug,
+          tomorrow,
+          scheduleCache
+        )
+
+        if (isVacationDay(tomorrowSchedule) && !isVacationDay(todaySchedule)) {
+          const vacationName = tomorrowSchedule.specialDay?.name ?? "Каникулы"
+          const noticeKey = `vacation|${tomorrowKey}`
+          if (recipient.state.lastVacationNoticeKey !== noticeKey) {
+            messages.unshift(`🏖️ Завтра начинаются каникулы: ${vacationName}`)
+            stateUpdates.lastVacationNoticeKey = noticeKey
+          }
         }
       }
 

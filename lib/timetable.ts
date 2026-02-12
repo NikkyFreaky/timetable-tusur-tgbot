@@ -272,6 +272,19 @@ function mapLessonType(kind: string): Lesson["type"] {
   return "lecture"
 }
 
+function parseTrainingSpecialDay(trainingHtml: string): DaySchedule["specialDay"] | null {
+  const text = stripHtml(trainingHtml).toLowerCase().replace(/ё/g, "е")
+
+  if (text.includes("каникул")) {
+    return {
+      type: "vacation",
+      name: "Каникулы",
+    }
+  }
+
+  return null
+}
+
 function calculateWeekIdFromDate(date: Date): number {
   const year = date.getMonth() >= 8 ? date.getFullYear() : date.getFullYear() - 1
   const startDate = new Date(year, 8, 1)
@@ -364,7 +377,13 @@ function parseWeekSchedule(
         const disciplineMatch = trainingHtml.match(
           /<span[^>]*class=['"][^'"]*discipline[^'"]*['"][^>]*>([\s\S]*?)<\/span>/i
         )
-        if (!disciplineMatch) continue
+        if (!disciplineMatch) {
+          const specialDay = parseTrainingSpecialDay(trainingHtml)
+          if (specialDay && !days[dayIndex].specialDay) {
+            days[dayIndex].specialDay = specialDay
+          }
+          continue
+        }
 
         const abbrMatch = trainingHtml.match(
           /<abbr[^>]*(?:title|data-original-title)=['"]([^'"]+)['"][^>]*>/i

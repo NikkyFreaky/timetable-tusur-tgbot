@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { Calendar, Settings, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { DAY_NAMES, type DaySchedule } from "@/lib/schedule-types"
+import { DAY_NAMES, type DaySchedule, type SpecialPeriod } from "@/lib/schedule-types"
 import {
   SPECIAL_PERIODS,
   getDayIndex,
@@ -80,6 +80,20 @@ const formatTime = (date: Date): string => {
   return `${hours}:${minutes}`
 }
 
+const buildTimetableSpecialPeriod = (
+  date: Date,
+  specialDay: DaySchedule["specialDay"]
+): SpecialPeriod => {
+  const dateKey = formatDateParam(date)
+  return {
+    id: `timetable-${specialDay?.type}-${dateKey}`,
+    type: specialDay?.type ?? "vacation",
+    name: specialDay?.name ?? "Каникулы",
+    startDate: dateKey,
+    endDate: dateKey,
+  }
+}
+
 export function ScheduleApp() {
   const { hapticFeedback, isReady, chat, user } = useTelegram()
   const { settings, updateSettings, resetSettings } = useSettings()
@@ -115,8 +129,7 @@ export function ScheduleApp() {
   const selectedDate = weekDates[selectedDay]
   const isCurrentWeek = selectedMonday.getTime() === todayMonday.getTime()
   const isToday = isCurrentWeek && selectedDay === currentDayIndex
-  const specialPeriod = isSpecialPeriod(selectedDate, SPECIAL_PERIODS)
-  const isNewYearHoliday = specialPeriod?.id === "ny2026"
+  const staticSpecialPeriod = isSpecialPeriod(selectedDate, SPECIAL_PERIODS)
 
   // Update current time every minute
   useEffect(() => {
@@ -186,6 +199,15 @@ export function ScheduleApp() {
       lessons: [],
     }
   }, [schedule, selectedDay])
+
+  const specialPeriod = useMemo(() => {
+    if (selectedDaySchedule.specialDay) {
+      return buildTimetableSpecialPeriod(selectedDate, selectedDaySchedule.specialDay)
+    }
+    return staticSpecialPeriod
+  }, [selectedDate, selectedDaySchedule.specialDay, staticSpecialPeriod])
+
+  const isNewYearHoliday = specialPeriod?.id === "ny2026"
 
   const hasLessons = useMemo(() => {
     return Array.from({ length: DAY_NAMES.length }, (_, i) => {
