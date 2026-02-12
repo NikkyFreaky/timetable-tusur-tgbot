@@ -40,7 +40,7 @@ export interface DaySchedule {
 }
 
 export interface TimetableSpecialDay {
-  type: "vacation"
+  type: "vacation" | "holiday"
   name: string
 }
 

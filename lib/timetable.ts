@@ -275,6 +275,20 @@ function mapLessonType(kind: string): Lesson["type"] {
 function parseTrainingSpecialDay(trainingHtml: string): DaySchedule["specialDay"] | null {
   const text = stripHtml(trainingHtml).toLowerCase().replace(/ё/g, "е")
 
+  if (text.includes("праздничн")) {
+    return {
+      type: "holiday",
+      name: "Праздничный день",
+    }
+  }
+
+  if (text.includes("выходн")) {
+    return {
+      type: "holiday",
+      name: "Выходной день",
+    }
+  }
+
   if (text.includes("каникул")) {
     return {
       type: "vacation",
