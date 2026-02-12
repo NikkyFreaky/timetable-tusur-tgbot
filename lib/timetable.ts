@@ -325,9 +325,13 @@ function parseWeekSchedule(
     lessons: [],
   }))
 
-  const tableMatch = html.match(
-    /<table[^>]*class=(["'])(?=[^"']*table-lessons)(?=[^"']*hidden-xs)(?=[^"']*hidden-sm)[^"']*\1[^>]*>[\s\S]*?<\/table>/i
-  )
+  const tableMatch =
+    html.match(
+      /<table[^>]*class=(["'])(?=[^"']*table-lessons)(?=[^"']*hidden-xs)(?=[^"']*hidden-sm)[^"']*\1[^>]*>[\s\S]*?<\/table>/i
+    ) ||
+    html.match(
+      /<table[^>]*class=(["'])(?=[^"']*table-lessons)[^"']*\1[^>]*>[\s\S]*?<\/table>/i
+    )
 
   const fallbackWeekType = getWeekType(weekStart)
   if (!tableMatch) {
@@ -346,7 +350,7 @@ function parseWeekSchedule(
     return formatLessonDate(date)
   })
 
-  const rowRegex = /<tr[^>]*class=['"][^'"]*lesson_\d+[^'"]*['"][^>]*>([\s\S]*?)<\/tr>/gi
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
   let rowMatch: RegExpExecArray | null
 
   while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
@@ -355,10 +359,8 @@ function parseWeekSchedule(
       /<th[^>]*class=['"]time['"][^>]*>[\s\S]*?<span>\s*(\d{1,2}:\d{2})\s*<\/span>[\s\S]*?<span>\s*(\d{1,2}:\d{2})\s*<\/span>/i
     )
 
-    if (!timeMatch) continue
-
-    const timeStart = timeMatch[1]
-    const timeEnd = timeMatch[2]
+    const timeStart = timeMatch?.[1]
+    const timeEnd = timeMatch?.[2]
 
     const cellRegex = /<td[^>]*class=['"][^'"]*lesson_cell[^'"]*day_(\d+)[^'"]*['"][^>]*>([\s\S]*?)<\/td>/gi
     let cellMatch: RegExpExecArray | null
@@ -417,6 +419,8 @@ function parseWeekSchedule(
         const idMatch =
           trainingHtml.match(/data-lesson-id=['"](\d+)['"]/i) ||
           trainingHtml.match(/<span[^>]*class=['"]hidden['"][^>]*>(\d+)<\/span>/i)
+
+        if (!timeStart || !timeEnd) continue
 
         const lessonId = idMatch?.[1] || `${dayIndex}-${timeStart}-${subject}`
         const modalInfo = lessonModals.get(lessonId)
