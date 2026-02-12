@@ -128,13 +128,15 @@ export function DayView({ schedule, specialPeriod, currentTime, isToday }: DayVi
             "w-16 h-16 rounded-full flex items-center justify-center mb-4",
             specialPeriod.type === "holiday" && "bg-red-500/20",
             specialPeriod.type === "exam" && "bg-orange-500/20",
-            specialPeriod.type === "vacation" && "bg-green-500/20"
+            specialPeriod.type === "vacation" && "bg-green-500/20",
+            specialPeriod.type === "practice" && "bg-sky-500/20"
           )}>
             <Calendar className={cn(
               "h-8 w-8",
               specialPeriod.type === "holiday" && "text-red-500",
               specialPeriod.type === "exam" && "text-orange-500",
-              specialPeriod.type === "vacation" && "text-green-500"
+              specialPeriod.type === "vacation" && "text-green-500",
+              specialPeriod.type === "practice" && "text-sky-500"
             )} />
           </div>
           <h3 className="font-semibold text-lg text-foreground mb-1">{specialPeriod.name}</h3>
@@ -142,6 +144,7 @@ export function DayView({ schedule, specialPeriod, currentTime, isToday }: DayVi
             {specialPeriod.type === "holiday" && "Выходной день"}
             {specialPeriod.type === "exam" && "Экзаменационный период"}
             {specialPeriod.type === "vacation" && "Каникулы"}
+            {specialPeriod.type === "practice" && "Практика"}
           </p>
         </div>
       )

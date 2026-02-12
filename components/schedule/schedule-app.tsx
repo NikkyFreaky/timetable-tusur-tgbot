@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { Calendar, Settings, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { DAY_NAMES, type DaySchedule } from "@/lib/schedule-types"
+import { DAY_NAMES, type DaySchedule, type SpecialPeriod } from "@/lib/schedule-types"
 import {
   SPECIAL_PERIODS,
   getDayIndex,
@@ -22,6 +22,7 @@ import { DaySelector } from "./day-selector"
 import { DayView } from "./day-view"
 import { UpcomingClasses } from "./upcoming-classes"
 import { SettingsPanel } from "./settings-panel"
+import { CenteredLoader } from "@/components/ui/centered-loader"
 
 const buildEmptySchedule = (): DaySchedule[] =>
   DAY_NAMES.map((name, index) => ({
@@ -80,6 +81,20 @@ const formatTime = (date: Date): string => {
   return `${hours}:${minutes}`
 }
 
+const buildTimetableSpecialPeriod = (
+  date: Date,
+  specialDay: DaySchedule["specialDay"]
+): SpecialPeriod => {
+  const dateKey = formatDateParam(date)
+  return {
+    id: `timetable-${specialDay?.type}-${dateKey}`,
+    type: specialDay?.type ?? "vacation",
+    name: specialDay?.name ?? "Каникулы",
+    startDate: dateKey,
+    endDate: dateKey,
+  }
+}
+
 export function ScheduleApp() {
   const { hapticFeedback, isReady, chat, user } = useTelegram()
   const { settings, updateSettings, resetSettings } = useSettings()
@@ -115,8 +130,7 @@ export function ScheduleApp() {
   const selectedDate = weekDates[selectedDay]
   const isCurrentWeek = selectedMonday.getTime() === todayMonday.getTime()
   const isToday = isCurrentWeek && selectedDay === currentDayIndex
-  const specialPeriod = isSpecialPeriod(selectedDate, SPECIAL_PERIODS)
-  const isNewYearHoliday = specialPeriod?.id === "ny2026"
+  const staticSpecialPeriod = isSpecialPeriod(selectedDate, SPECIAL_PERIODS)
 
   // Update current time every minute
   useEffect(() => {
@@ -186,6 +200,15 @@ export function ScheduleApp() {
       lessons: [],
     }
   }, [schedule, selectedDay])
+
+  const specialPeriod = useMemo(() => {
+    if (selectedDaySchedule.specialDay) {
+      return buildTimetableSpecialPeriod(selectedDate, selectedDaySchedule.specialDay)
+    }
+    return staticSpecialPeriod
+  }, [selectedDate, selectedDaySchedule.specialDay, staticSpecialPeriod])
+
+  const isNewYearHoliday = specialPeriod?.id === "ny2026"
 
   const hasLessons = useMemo(() => {
     return Array.from({ length: DAY_NAMES.length }, (_, i) => {
@@ -319,52 +342,56 @@ export function ScheduleApp() {
               isCurrentWeek={isCurrentWeek}
             />
 
-            {scheduleError ? (
-              <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
-            ) : isScheduleLoading ? (
-              <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
-            ) : null}
+             {scheduleError ? (
+               <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
+             ) : isScheduleLoading ? (
+               <CenteredLoader label="Загрузка расписания..." className="min-h-[320px]" />
+             ) : (
+               <>
+                 {/* Day Header */}
+                 <div className="px-4 py-3 border-b border-border">
+                   <div className="flex items-center justify-between">
+                     <div>
+                       <h2 className="font-semibold text-foreground">{DAY_NAMES[selectedDay]}</h2>
+                       <p className="text-xs text-muted-foreground">
+                         {formatDayDate(selectedDate)}
+                         {isToday && " • Сегодня"}
+                       </p>
+                     </div>
+                     {specialPeriod && (
+                       <span className={cn(
+                         "text-xs px-2 py-1 rounded-full border border-transparent",
+                         isNewYearHoliday &&
+                           "border-amber-200/70 bg-gradient-to-r from-amber-200/70 via-rose-200/60 to-sky-200/70 text-amber-700",
+                         !isNewYearHoliday &&
+                           specialPeriod.type === "holiday" &&
+                           "bg-red-500/10 text-red-600 dark:text-red-400",
+                         specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                         specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400",
+                         specialPeriod.type === "practice" && "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                       )}>
+                         {isNewYearHoliday && "Новогодние"}
+                         {specialPeriod.type === "holiday" && !isNewYearHoliday && "Выходной"}
+                         {specialPeriod.type === "exam" && "Сессия"}
+                         {specialPeriod.type === "vacation" && "Каникулы"}
+                         {specialPeriod.type === "practice" && "Практика"}
+                       </span>
+                     )}
+                   </div>
+                 </div>
 
-            {/* Day Header */}
-            <div className="px-4 py-3 border-b border-border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-foreground">{DAY_NAMES[selectedDay]}</h2>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDayDate(selectedDate)}
-                    {isToday && " • Сегодня"}
-                  </p>
-                </div>
-                {specialPeriod && (
-                  <span className={cn(
-                    "text-xs px-2 py-1 rounded-full border border-transparent",
-                    isNewYearHoliday &&
-                      "border-amber-200/70 bg-gradient-to-r from-amber-200/70 via-rose-200/60 to-sky-200/70 text-amber-700",
-                    !isNewYearHoliday &&
-                      specialPeriod.type === "holiday" &&
-                      "bg-red-500/10 text-red-600 dark:text-red-400",
-                    specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                    specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
-                  )}>
-                    {isNewYearHoliday && "Новогодние"}
-                    {specialPeriod.type === "holiday" && !isNewYearHoliday && "Выходной"}
-                    {specialPeriod.type === "exam" && "Сессия"}
-                    {specialPeriod.type === "vacation" && "Каникулы"}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Schedule */}
-            <DayView
-              schedule={selectedDaySchedule}
-              specialPeriod={specialPeriod}
-              currentTime={currentTime}
-              isToday={isToday}
-            />
-          </>
-        ) : (
-          <>
+                 {/* Schedule */}
+                 <DayView
+                   schedule={selectedDaySchedule}
+                   specialPeriod={specialPeriod}
+                   currentTime={currentTime}
+                   isToday={isToday}
+                 />
+               </>
+             )}
+           </>
+         ) : (
+           <>
             {/* Today's Date */}
             <div className="px-4 py-4 border-b border-border">
               <p className="text-sm text-muted-foreground capitalize">{formatDate(today)}</p>
@@ -373,54 +400,58 @@ export function ScheduleApp() {
               </p>
             </div>
 
-            {scheduleError ? (
-              <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
-            ) : isScheduleLoading ? (
-              <div className="px-4 py-2 text-sm text-muted-foreground">Загрузка расписания...</div>
-            ) : null}
+             {scheduleError ? (
+               <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
+             ) : isScheduleLoading ? (
+               <CenteredLoader label="Загрузка расписания..." className="min-h-[320px]" />
+             ) : (
+               <>
+                 {/* Special Period Notice */}
+                 {specialPeriod && (
+                   <div className={cn(
+                     "mx-4 mt-4 p-3 rounded-xl text-sm border border-transparent",
+                     isNewYearHoliday &&
+                       "border-amber-200/70 bg-gradient-to-br from-amber-100/70 via-rose-100/60 to-sky-100/70 text-amber-700",
+                     !isNewYearHoliday &&
+                       specialPeriod.type === "holiday" &&
+                       "bg-red-500/10 text-red-600 dark:text-red-400",
+                     specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+                     specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400",
+                     specialPeriod.type === "practice" && "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                   )}>
+                     <div className="flex items-start gap-2">
+                       {isNewYearHoliday && <Sparkles className="h-4 w-4 mt-0.5" />}
+                       <div>
+                         <strong>{specialPeriod.name}</strong>
+                         <span
+                           className={cn(
+                             "ml-2",
+                             isNewYearHoliday ? "text-amber-700/80" : "text-muted-foreground"
+                           )}
+                         >
+                           {specialPeriod.type === "holiday" && "• Выходной"}
+                           {specialPeriod.type === "exam" && "• Сессия"}
+                           {specialPeriod.type === "vacation" && "• Каникулы"}
+                           {specialPeriod.type === "practice" && "• Практика"}
+                         </span>
+                       </div>
+                     </div>
+                   </div>
+                 )}
 
-            {/* Special Period Notice */}
-            {specialPeriod && (
-              <div className={cn(
-                "mx-4 mt-4 p-3 rounded-xl text-sm border border-transparent",
-                isNewYearHoliday &&
-                  "border-amber-200/70 bg-gradient-to-br from-amber-100/70 via-rose-100/60 to-sky-100/70 text-amber-700",
-                !isNewYearHoliday &&
-                  specialPeriod.type === "holiday" &&
-                  "bg-red-500/10 text-red-600 dark:text-red-400",
-                specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
-              )}>
-                <div className="flex items-start gap-2">
-                  {isNewYearHoliday && <Sparkles className="h-4 w-4 mt-0.5" />}
-                  <div>
-                    <strong>{specialPeriod.name}</strong>
-                    <span
-                      className={cn(
-                        "ml-2",
-                        isNewYearHoliday ? "text-amber-700/80" : "text-muted-foreground"
-                      )}
-                    >
-                      {specialPeriod.type === "holiday" && "• Выходной"}
-                      {specialPeriod.type === "exam" && "• Сессия"}
-                      {specialPeriod.type === "vacation" && "• Каникулы"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Upcoming Classes */}
-            <UpcomingClasses
-              schedule={schedule}
-              currentDayIndex={currentDayIndex}
-              weekDates={weekDates}
-              isCurrentWeek={isCurrentWeek}
-              currentTime={currentTime}
-              onViewDay={handleViewDay}
-            />
-          </>
-        )}
+                 {/* Upcoming Classes */}
+                 <UpcomingClasses
+                   schedule={schedule}
+                   currentDayIndex={currentDayIndex}
+                   weekDates={weekDates}
+                   isCurrentWeek={isCurrentWeek}
+                   currentTime={currentTime}
+                   onViewDay={handleViewDay}
+                 />
+               </>
+             )}
+           </>
+         )}
       </main>
 
       {/* No Group Selected Notice */}

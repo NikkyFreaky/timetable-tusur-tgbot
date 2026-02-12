@@ -5,6 +5,7 @@ import { ChevronRight, GraduationCap, Bell, Clock, RotateCcw, Check, ChevronDown
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CenteredLoader } from "@/components/ui/centered-loader"
 import { cn } from "@/lib/utils"
 import type { UserSettings } from "@/lib/schedule-types"
 import type { StoredChat } from "@/lib/chat-store"
@@ -923,9 +924,7 @@ export function SettingsPanel({
                     </div>
                   )}
                   {userId && isLoadingChats && (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      Загрузка групп...
-                    </div>
+                    <CenteredLoader label="Загрузка групп..." className="min-h-[180px]" />
                   )}
                   {userId && !isLoadingChats && chatsError && (
                     <div className="px-4 py-8 text-center text-destructive">
@@ -1241,9 +1240,7 @@ export function SettingsPanel({
               {groupView === "faculty" && (
                 <div className="py-2">
                   {isLoadingFaculties && (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      Загрузка факультетов...
-                    </div>
+                    <CenteredLoader label="Загрузка факультетов..." className="min-h-[180px]" />
                   )}
                   {!isLoadingFaculties && facultiesError && (
                     <div className="px-4 py-8 text-center text-destructive">
@@ -1300,9 +1297,7 @@ export function SettingsPanel({
                     </div>
                   )}
                   {tempGroupFacultySlug && isLoadingCourses && (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      Загрузка курсов...
-                    </div>
+                    <CenteredLoader label="Загрузка курсов..." className="min-h-[180px]" />
                   )}
                   {tempGroupFacultySlug && !isLoadingCourses && coursesError && (
                     <div className="px-4 py-8 text-center text-destructive">
@@ -1360,9 +1355,7 @@ export function SettingsPanel({
                     </div>
                   )}
                   {tempGroupCourse && isLoadingCourses && (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      Загрузка групп...
-                    </div>
+                    <CenteredLoader label="Загрузка групп..." className="min-h-[180px]" />
                   )}
                   {tempGroupCourse && !isLoadingCourses && coursesError && (
                     <div className="px-4 py-8 text-center text-destructive">
@@ -1543,9 +1536,7 @@ export function SettingsPanel({
               {view === "faculty" && (
                 <div className="py-2">
                   {isLoadingFaculties && (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      Загрузка факультетов...
-                    </div>
+                    <CenteredLoader label="Загрузка факультетов..." className="min-h-[180px]" />
                   )}
                   {!isLoadingFaculties && facultiesError && (
                     <div className="px-4 py-8 text-center text-destructive">
@@ -1602,9 +1593,7 @@ export function SettingsPanel({
                     </div>
                   )}
                   {tempFacultySlug && isLoadingCourses && (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      Загрузка курсов...
-                    </div>
+                    <CenteredLoader label="Загрузка курсов..." className="min-h-[180px]" />
                   )}
                   {tempFacultySlug && !isLoadingCourses && coursesError && (
                     <div className="px-4 py-8 text-center text-destructive">
@@ -1661,9 +1650,7 @@ export function SettingsPanel({
                     </div>
                   )}
                   {tempCourse && isLoadingCourses && (
-                    <div className="px-4 py-8 text-center text-muted-foreground">
-                      Загрузка групп...
-                    </div>
+                    <CenteredLoader label="Загрузка групп..." className="min-h-[180px]" />
                   )}
                   {tempCourse && !isLoadingCourses && coursesError && (
                     <div className="px-4 py-8 text-center text-destructive">

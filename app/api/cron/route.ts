@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server"
 import { DAY_NAMES, LESSON_TYPES, type DaySchedule, type UserSettings } from "@/lib/schedule-types"
 import {
-  SPECIAL_PERIODS,
   getDayIndex,
   getMondayOfWeek,
   getWeekType,
-  isSpecialPeriod,
   formatDayDate,
 } from "@/lib/schedule-data"
 import { fetchWeekSchedule } from "@/lib/timetable"
@@ -211,6 +209,14 @@ function buildWeekStartMessage(date: Date) {
   return `🗓️ Начало недели — ${dateLabel}\n📊 ${weekType} неделя`
 }
 
+function isVacationDay(schedule: DaySchedule) {
+  return schedule.specialDay?.type === "vacation"
+}
+
+function isHolidayDay(schedule: DaySchedule) {
+  return schedule.specialDay?.type === "holiday"
+}
+
 export async function GET(request: Request) {
   const botToken = process.env.BOT_TOKEN
   const cronSecret = process.env.CRON_SECRET
@@ -361,39 +367,44 @@ export async function GET(request: Request) {
         }
       }
 
-      const todaySpecial = isSpecialPeriod(now, SPECIAL_PERIODS)
-      if (settings.notifyHolidayDay && todaySpecial?.type === "holiday") {
+      if (settings.notifyHolidayDay && isHolidayDay(todaySchedule)) {
+        const holidayName = todaySchedule.specialDay?.name ?? "Праздничный день"
         if (recipient.state.lastHolidayDayDate !== todayKey) {
-          messages.unshift(`🎉 Сегодня праздник: ${todaySpecial.name}`)
+          messages.unshift(`🎉 Сегодня праздник: ${holidayName}`)
           stateUpdates.lastHolidayDayDate = todayKey
         }
       }
 
       const tomorrow = addDays(now, 1)
       const tomorrowKey = formatDateKey(tomorrow)
-      const tomorrowSpecial = isSpecialPeriod(tomorrow, SPECIAL_PERIODS)
+      const tomorrowSchedule = await getScheduleForDate(
+        settings.facultySlug,
+        settings.groupSlug,
+        tomorrow,
+        scheduleCache
+      )
 
-    if (
-      settings.notifyHolidays &&
-      tomorrowSpecial?.type === "holiday" &&
-      tomorrowKey === tomorrowSpecial.startDate
-    ) {
-        const noticeKey = `${tomorrowSpecial.id}|${tomorrowKey}`
+      if (
+        settings.notifyHolidays &&
+        isHolidayDay(tomorrowSchedule) &&
+        !isHolidayDay(todaySchedule)
+      ) {
+        const holidayName = tomorrowSchedule.specialDay?.name ?? "Праздничный день"
+        const noticeKey = `holiday|${tomorrowKey}`
         if (recipient.state.lastHolidayNoticeKey !== noticeKey) {
-          messages.unshift(`🎉 Завтра праздник: ${tomorrowSpecial.name}`)
+          messages.unshift(`🎉 Завтра праздник: ${holidayName}`)
           stateUpdates.lastHolidayNoticeKey = noticeKey
         }
       }
 
-    if (
-      settings.notifyVacations &&
-      tomorrowSpecial?.type === "vacation" &&
-      tomorrowKey === tomorrowSpecial.startDate
-    ) {
-        const noticeKey = `${tomorrowSpecial.id}|${tomorrowKey}`
-        if (recipient.state.lastVacationNoticeKey !== noticeKey) {
-          messages.unshift(`🏖️ Завтра начинаются каникулы: ${tomorrowSpecial.name}`)
-          stateUpdates.lastVacationNoticeKey = noticeKey
+      if (settings.notifyVacations) {
+        if (isVacationDay(tomorrowSchedule) && !isVacationDay(todaySchedule)) {
+          const vacationName = tomorrowSchedule.specialDay?.name ?? "Каникулы"
+          const noticeKey = `vacation|${tomorrowKey}`
+          if (recipient.state.lastVacationNoticeKey !== noticeKey) {
+            messages.unshift(`🏖️ Завтра начинаются каникулы: ${vacationName}`)
+            stateUpdates.lastVacationNoticeKey = noticeKey
+          }
         }
       }
 
