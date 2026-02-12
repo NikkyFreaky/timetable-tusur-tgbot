@@ -40,7 +40,7 @@ export interface DaySchedule {
 }
 
 export interface TimetableSpecialDay {
-  type: "vacation" | "holiday"
+  type: "vacation" | "holiday" | "practice"
   name: string
 }
 
@@ -84,7 +84,7 @@ export interface UserSettings {
 
 export interface SpecialPeriod {
   id: string
-  type: "holiday" | "exam" | "vacation" | "weekend"
+  type: "holiday" | "exam" | "vacation" | "weekend" | "practice"
   name: string
   startDate: string
   endDate: string

@@ -367,12 +367,14 @@ export function ScheduleApp() {
                            specialPeriod.type === "holiday" &&
                            "bg-red-500/10 text-red-600 dark:text-red-400",
                          specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                         specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
+                         specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400",
+                         specialPeriod.type === "practice" && "bg-sky-500/10 text-sky-600 dark:text-sky-400"
                        )}>
                          {isNewYearHoliday && "Новогодние"}
                          {specialPeriod.type === "holiday" && !isNewYearHoliday && "Выходной"}
                          {specialPeriod.type === "exam" && "Сессия"}
                          {specialPeriod.type === "vacation" && "Каникулы"}
+                         {specialPeriod.type === "practice" && "Практика"}
                        </span>
                      )}
                    </div>
@@ -414,7 +416,8 @@ export function ScheduleApp() {
                        specialPeriod.type === "holiday" &&
                        "bg-red-500/10 text-red-600 dark:text-red-400",
                      specialPeriod.type === "exam" && "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                     specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400"
+                     specialPeriod.type === "vacation" && "bg-green-500/10 text-green-600 dark:text-green-400",
+                     specialPeriod.type === "practice" && "bg-sky-500/10 text-sky-600 dark:text-sky-400"
                    )}>
                      <div className="flex items-start gap-2">
                        {isNewYearHoliday && <Sparkles className="h-4 w-4 mt-0.5" />}
@@ -429,6 +432,7 @@ export function ScheduleApp() {
                            {specialPeriod.type === "holiday" && "• Выходной"}
                            {specialPeriod.type === "exam" && "• Сессия"}
                            {specialPeriod.type === "vacation" && "• Каникулы"}
+                           {specialPeriod.type === "practice" && "• Практика"}
                          </span>
                        </div>
                      </div>

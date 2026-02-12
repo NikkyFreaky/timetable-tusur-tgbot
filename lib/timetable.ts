@@ -10,6 +10,7 @@ const TUSUR_BASE_URL = "https://tusur.ru"
 const FACULTY_PHOTOS_URL =
   "https://tusur.ru/ru/o-tusure/struktura-i-organy-upravleniya/departament-obrazovaniya/fakultety-i-kafedry"
 const FACULTIES_CACHE_KEY = "faculties"
+const SCHEDULE_CACHE_VERSION = "v2"
 let facultiesInFlight: Promise<FacultyOption[]> | null = null
 const BASE_WEEK_ID = 786
 
@@ -273,7 +274,8 @@ function mapLessonType(kind: string): Lesson["type"] {
 }
 
 function parseTrainingSpecialDay(trainingHtml: string): DaySchedule["specialDay"] | null {
-  const text = stripHtml(trainingHtml).toLowerCase().replace(/ё/g, "е")
+  const rawText = stripHtml(trainingHtml).replace(/\s+/g, " ").trim()
+  const text = rawText.toLowerCase().replace(/ё/g, "е")
 
   if (text.includes("праздничн")) {
     return {
@@ -293,6 +295,13 @@ function parseTrainingSpecialDay(trainingHtml: string): DaySchedule["specialDay"
     return {
       type: "vacation",
       name: "Каникулы",
+    }
+  }
+
+  if (text.includes("практик")) {
+    return {
+      type: "practice",
+      name: rawText || "Практика",
     }
   }
 
@@ -715,7 +724,7 @@ export async function fetchWeekSchedule(
   groupSlug: string,
   weekStart: Date
 ): Promise<{ weekType: "even" | "odd"; days: DaySchedule[] }> {
-  const cacheKey = `schedule:${facultySlug}:${groupSlug}:${weekStart.toISOString().split('T')[0]}`
+  const cacheKey = `schedule:${SCHEDULE_CACHE_VERSION}:${facultySlug}:${groupSlug}:${weekStart.toISOString().split('T')[0]}`
 
   const cached = await get<{ weekType: "even" | "odd"; days: DaySchedule[] }>(cacheKey)
   if (cached) {
