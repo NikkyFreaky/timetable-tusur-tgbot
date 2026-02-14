@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { ChevronRight, GraduationCap, Bell, Clock, RotateCcw, Check, ChevronDown, Users, AlertCircle, RefreshCw } from "lucide-react"
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
+import { ChevronRight, GraduationCap, Bell, Clock, RotateCcw, Check, ChevronDown, Users, AlertCircle, RefreshCw, Search, X } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CenteredLoader } from "@/components/ui/centered-loader"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import type { UserSettings } from "@/lib/schedule-types"
 import type { StoredChat } from "@/lib/chat-store"
@@ -53,6 +54,17 @@ const WHEEL_ITEM_HEIGHT = 44
 const WHEEL_VISIBLE_ITEMS = 5
 const WHEEL_CONTAINER_HEIGHT = WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ITEMS
 
+interface GroupSearchMatch {
+  facultySlug: string
+  facultyName: string
+  courseNumber: number
+  groupSlug: string
+  groupName: string
+}
+
+const normalizeSearchValue = (value: string) =>
+  value.toLocaleLowerCase("ru-RU").replace(/\s+/g, "")
+
 export function SettingsPanel({
   open,
   onOpenChange,
@@ -67,6 +79,7 @@ export function SettingsPanel({
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal")
   const [tempFacultySlug, setTempFacultySlug] = useState<string | null>(settings.facultySlug)
   const [tempCourse, setTempCourse] = useState<number | null>(settings.course)
+  const [personalGroupSearchQuery, setPersonalGroupSearchQuery] = useState("")
   const [faculties, setFaculties] = useState<FacultyOption[]>([])
   const [coursesByFaculty, setCoursesByFaculty] = useState<Record<string, CourseOption[]>>({})
   const [isLoadingFaculties, setIsLoadingFaculties] = useState(false)
@@ -93,6 +106,7 @@ export function SettingsPanel({
   const [groupView, setGroupView] = useState<SettingsView>("main")
   const [tempGroupFacultySlug, setTempGroupFacultySlug] = useState<string | null>(null)
   const [tempGroupCourse, setTempGroupCourse] = useState<number | null>(null)
+  const [groupSettingsSearchQuery, setGroupSettingsSearchQuery] = useState("")
   const [tempGroupSettings, setTempGroupSettings] = useState<UserSettings>({
     facultySlug: null,
     facultyName: null,
@@ -120,6 +134,10 @@ export function SettingsPanel({
   const selectedFacultyName = settings.facultyName
   const selectedGroupName = settings.groupName
   const timeParts = parseNotificationTime(settings.notificationTime)
+  const deferredPersonalGroupSearchQuery = useDeferredValue(personalGroupSearchQuery)
+  const deferredGroupSettingsSearchQuery = useDeferredValue(groupSettingsSearchQuery)
+  const normalizedPersonalGroupSearchQuery = normalizeSearchValue(deferredPersonalGroupSearchQuery)
+  const normalizedGroupSettingsSearchQuery = normalizeSearchValue(deferredGroupSettingsSearchQuery)
 
   useEffect(() => {
     latestTimeParts.current = timeParts
@@ -130,6 +148,8 @@ export function SettingsPanel({
 
     setTempFacultySlug(settings.facultySlug)
     setTempCourse(settings.course)
+    setPersonalGroupSearchQuery("")
+    setGroupSettingsSearchQuery("")
 
     let cancelled = false
     setIsLoadingFaculties(true)
@@ -241,27 +261,64 @@ export function SettingsPanel({
   }
 
   useEffect(() => {
-    const missingFacultySlug = [tempFacultySlug, tempGroupFacultySlug].find(
-      (slug): slug is string => Boolean(slug && !coursesByFaculty[slug])
+    const requiredFacultySlugs = new Set<string>()
+
+    if (tempFacultySlug) {
+      requiredFacultySlugs.add(tempFacultySlug)
+    }
+
+    if (tempGroupFacultySlug) {
+      requiredFacultySlugs.add(tempGroupFacultySlug)
+    }
+
+    const shouldBuildPersonalSearchIndex =
+      normalizedPersonalGroupSearchQuery.length > 0 &&
+      (view === "faculty" || view === "course" || view === "group")
+
+    const shouldBuildGroupSearchIndex =
+      normalizedGroupSettingsSearchQuery.length > 0 &&
+      groupView !== "main" &&
+      groupView !== "time"
+
+    if (shouldBuildPersonalSearchIndex || shouldBuildGroupSearchIndex) {
+      faculties.forEach((faculty) => {
+        requiredFacultySlugs.add(faculty.slug)
+      })
+    }
+
+    const missingFacultySlugs = Array.from(requiredFacultySlugs).filter(
+      (slug) => !coursesByFaculty[slug]
     )
 
-    if (!missingFacultySlug) return
+    if (missingFacultySlugs.length === 0) return
 
     let cancelled = false
     setIsLoadingCourses(true)
     setCoursesError(null)
 
-    fetch(`/api/faculties/${missingFacultySlug}/courses`)
-      .then(async (response) => {
+    Promise.all(
+      missingFacultySlugs.map(async (facultySlug) => {
+        const response = await fetch(`/api/faculties/${facultySlug}/courses`)
         if (!response.ok) {
           throw new Error("⚠️ Не удалось загрузить курсы. Попробуйте ещё раз чуть позже.")
         }
+
         const data = (await response.json()) as { courses: CourseOption[] }
+        return {
+          facultySlug,
+          courses: data.courses || [],
+        }
+      })
+    )
+      .then((entries) => {
         if (!cancelled) {
-          setCoursesByFaculty((prev) => ({
-            ...prev,
-            [missingFacultySlug]: data.courses || [],
-          }))
+          setCoursesByFaculty((prev) => {
+            const next = { ...prev }
+            entries.forEach((entry) => {
+              next[entry.facultySlug] = entry.courses
+            })
+            return next
+          })
         }
       })
       .catch((error) => {
@@ -278,7 +335,16 @@ export function SettingsPanel({
     return () => {
       cancelled = true
     }
-  }, [tempFacultySlug, tempGroupFacultySlug, coursesByFaculty])
+  }, [
+    tempFacultySlug,
+    tempGroupFacultySlug,
+    normalizedPersonalGroupSearchQuery,
+    normalizedGroupSettingsSearchQuery,
+    view,
+    groupView,
+    coursesByFaculty,
+    faculties,
+  ])
 
   useEffect(() => {
     if (view !== "time") return
@@ -615,6 +681,8 @@ export function SettingsPanel({
       setGroupView("main")
       setTempGroupFacultySlug(null)
       setTempGroupCourse(null)
+      setPersonalGroupSearchQuery("")
+      setGroupSettingsSearchQuery("")
       setTempGroupSettings({
         facultySlug: null,
         facultyName: null,
@@ -665,6 +733,171 @@ export function SettingsPanel({
   const availableGroupOptions = selectedGroupCourse?.groups || []
   const hours = Array.from({ length: 24 }, (_, index) => index)
   const minutes = Array.from({ length: 60 }, (_, index) => index)
+
+  const buildGroupSearchMatches = (normalizedQuery: string): GroupSearchMatch[] => {
+    if (!normalizedQuery) return []
+
+    const matches: GroupSearchMatch[] = []
+
+    faculties.forEach((faculty) => {
+      const courses = coursesByFaculty[faculty.slug] || []
+
+      courses.forEach((course) => {
+        course.groups.forEach((group) => {
+          if (normalizeSearchValue(group.name).includes(normalizedQuery)) {
+            matches.push({
+              facultySlug: faculty.slug,
+              facultyName: faculty.name,
+              courseNumber: course.number,
+              groupSlug: group.slug,
+              groupName: group.name,
+            })
+          }
+        })
+      })
+    })
+
+    return matches.sort((first, second) => {
+      const firstStartsWith = normalizeSearchValue(first.groupName).startsWith(normalizedQuery)
+      const secondStartsWith = normalizeSearchValue(second.groupName).startsWith(normalizedQuery)
+
+      if (firstStartsWith !== secondStartsWith) {
+        return firstStartsWith ? -1 : 1
+      }
+
+      const byName = first.groupName.localeCompare(second.groupName, "ru")
+      if (byName !== 0) {
+        return byName
+      }
+
+      return first.courseNumber - second.courseNumber
+    })
+  }
+
+  const personalGroupSearchMatches = useMemo(
+    () => buildGroupSearchMatches(normalizedPersonalGroupSearchQuery),
+    [normalizedPersonalGroupSearchQuery, faculties, coursesByFaculty]
+  )
+
+  const groupSettingsSearchMatches = useMemo(
+    () => buildGroupSearchMatches(normalizedGroupSettingsSearchQuery),
+    [normalizedGroupSettingsSearchQuery, faculties, coursesByFaculty]
+  )
+
+  const handleSelectGroupFromPersonalSearch = (match: GroupSearchMatch) => {
+    hapticFeedback("success")
+
+    setTempFacultySlug(match.facultySlug)
+    setTempCourse(match.courseNumber)
+    setPersonalGroupSearchQuery("")
+
+    onUpdateSettings({
+      facultySlug: match.facultySlug,
+      facultyName: match.facultyName,
+      course: match.courseNumber,
+      groupSlug: match.groupSlug,
+      groupName: match.groupName,
+    })
+
+    setView("main")
+  }
+
+  const handleSelectGroupFromGroupSettingsSearch = (match: GroupSearchMatch) => {
+    hapticFeedback("success")
+
+    setTempGroupFacultySlug(match.facultySlug)
+    setTempGroupCourse(match.courseNumber)
+    setGroupSettingsSearchQuery("")
+
+    handleUpdateGroupSettings({
+      facultySlug: match.facultySlug,
+      facultyName: match.facultyName,
+      course: match.courseNumber,
+      groupSlug: match.groupSlug,
+      groupName: match.groupName,
+    })
+
+    setGroupView("main")
+  }
+
+  const renderGroupSearch = ({
+    query,
+    onChange,
+    onClear,
+    matches,
+    onSelect,
+    disabled,
+  }: {
+    query: string
+    onChange: (value: string) => void
+    onClear: () => void
+    matches: GroupSearchMatch[]
+    onSelect: (match: GroupSearchMatch) => void
+    disabled?: boolean
+  }) => {
+    const hasQuery = query.trim().length > 0
+
+    return (
+      <div className="px-4 pb-3 space-y-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Найти группу по названию"
+            className="h-11 rounded-xl pl-10 pr-10 bg-card"
+            autoComplete="off"
+            disabled={disabled}
+          />
+          {hasQuery && !disabled && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Очистить поиск"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        {hasQuery && (
+          <div className="rounded-xl border border-border bg-card/50">
+            {coursesError ? (
+              <div className="px-3 py-2.5 text-xs text-destructive">
+                {coursesError}
+              </div>
+            ) : isLoadingCourses ? (
+              <div className="px-3 py-2.5 text-xs text-muted-foreground">
+                Индексируем группы для поиска...
+              </div>
+            ) : matches.length > 0 ? (
+              matches.slice(0, 8).map((match) => (
+                <button
+                  key={`${match.facultySlug}:${match.courseNumber}:${match.groupSlug}`}
+                  type="button"
+                  onClick={() => onSelect(match)}
+                  disabled={disabled}
+                  className={cn(
+                    "w-full border-b border-border/70 px-3 py-2.5 text-left last:border-b-0 active:bg-accent/50",
+                    disabled && "cursor-not-allowed opacity-50"
+                  )}
+                >
+                  <div className="font-medium text-foreground">Группа {match.groupName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {match.facultyName}, {match.courseNumber} курс
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-2.5 text-xs text-muted-foreground">
+                Ничего не найдено. Проверьте название группы.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
@@ -1237,6 +1470,15 @@ export function SettingsPanel({
           {/* Group sub-views */}
           {view === "main" && groupView !== "main" && (
             <div className="py-4">
+              {(groupView === "faculty" || groupView === "course" || groupView === "group") &&
+                renderGroupSearch({
+                  query: groupSettingsSearchQuery,
+                  onChange: setGroupSettingsSearchQuery,
+                  onClear: () => setGroupSettingsSearchQuery(""),
+                  matches: groupSettingsSearchMatches,
+                  onSelect: handleSelectGroupFromGroupSettingsSearch,
+                  disabled: userRole === "member",
+                })}
               {groupView === "faculty" && (
                 <div className="py-2">
                   {isLoadingFaculties && (
@@ -1533,6 +1775,14 @@ export function SettingsPanel({
           {/* Personal sub-views */}
           {view !== "main" && (
             <div className="py-4">
+              {(view === "faculty" || view === "course" || view === "group") &&
+                renderGroupSearch({
+                  query: personalGroupSearchQuery,
+                  onChange: setPersonalGroupSearchQuery,
+                  onClear: () => setPersonalGroupSearchQuery(""),
+                  matches: personalGroupSearchMatches,
+                  onSelect: handleSelectGroupFromPersonalSearch,
+                })}
               {view === "faculty" && (
                 <div className="py-2">
                   {isLoadingFaculties && (
