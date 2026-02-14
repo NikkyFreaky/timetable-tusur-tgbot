@@ -1,5 +1,7 @@
 # AGENTS.md
 
+When you need to search docs, use `context7` tools.
+
 This file provides guidance for agentic coding agents working in this repository.
 
 ## Project Overview
