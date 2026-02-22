@@ -7,6 +7,7 @@ export async function proxy(request: NextRequest) {
   // Пропускаем страницу логина и API auth
   if (
     pathname === '/admin/login' ||
+    pathname === '/admin/reset-password' ||
     pathname.startsWith('/api/admin/auth')
   ) {
     const { response } = await createSupabaseMiddlewareClient(request)
