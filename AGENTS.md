@@ -15,17 +15,21 @@ npm run dev
 # Production build
 npm run build
 
-# Start production server
+# Start production server  
 npm start
 
-# Lint code
-npm run lint
-
-# Type checking (not in package.json - run tsc directly)
+# Type checking (primary linting method)
 npx tsc --noEmit
+
+# Lint code (currently not fully configured - prefer type checking)
+npm run lint
 ```
 
-**Note:** This project currently has no test framework configured. When adding tests, consider using Jest or Vitest with React Testing Library.
+**Testing:** This project currently has no test framework configured. When adding tests:
+- Use Vitest (preferred for Next.js 16) or Jest
+- Install React Testing Library for component tests
+- Add test scripts to package.json: `"test": "vitest"`, `"test:ui": "vitest --ui"`
+- Single test file: `npx vitest run path/to/test.spec.ts`
 
 ## Code Style Guidelines
 
@@ -196,3 +200,4 @@ Example:
 - Use `zod` for validation when needed
 - The project uses TypeScript path alias `@/*` for imports from root
 - No ESLint config is present - TypeScript compiler provides linting
+
