@@ -230,12 +230,14 @@ export function ScheduleApp() {
     hapticFeedback("light")
     setSelectedMonday((prev) => addWeeks(prev, -1))
     setSelectedDay(0)
+    if (viewMode === "upcoming") setViewMode("day")
   }
 
   const handleNextWeek = () => {
     hapticFeedback("light")
     setSelectedMonday((prev) => addWeeks(prev, 1))
     setSelectedDay(0)
+    if (viewMode === "upcoming") setViewMode("day")
   }
 
   const handleGoToToday = () => {
@@ -357,6 +359,10 @@ export function ScheduleApp() {
               onClick={() => {
                 hapticFeedback("selection")
                 setViewMode("upcoming")
+                if (!isCurrentWeek) {
+                  setSelectedMonday(todayMonday)
+                  setSelectedDay(currentDayIndex)
+                }
               }}
               className={cn(
                 "flex-1 py-2.5 text-sm font-medium transition-colors",
