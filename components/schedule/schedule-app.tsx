@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Calendar, Settings, Sparkles } from "lucide-react"
+import { Calendar as CalendarIcon, Settings, Sparkles } from "lucide-react"
+import { ru } from "react-day-picker/locale"
 import { cn } from "@/lib/utils"
 import { DAY_NAMES, type DaySchedule, type SpecialPeriod } from "@/lib/schedule-types"
 import {
@@ -17,6 +18,8 @@ import {
 } from "@/lib/schedule-data"
 import { useSettings } from "@/lib/settings-store"
 import { useTelegram } from "@/lib/telegram-context"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { WeekToggle } from "./week-toggle"
 import { DaySelector } from "./day-selector"
 import { DayView } from "./day-view"
@@ -114,6 +117,7 @@ export function ScheduleApp() {
   const [selectedDay, setSelectedDay] = useState(currentDayIndex)
   const [currentTime, setCurrentTime] = useState(() => formatTime(getTomskNow()))
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"day" | "upcoming">("day")
   const [schedule, setSchedule] = useState<DaySchedule[]>(() => buildEmptySchedule())
   const [isScheduleLoading, setIsScheduleLoading] = useState(false)
@@ -243,6 +247,17 @@ export function ScheduleApp() {
     setViewMode("day")
   }
 
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (!date) return
+    hapticFeedback("medium")
+    const monday = getMondayOfWeek(date)
+    const dayIndex = getDayIndex(date)
+    setSelectedMonday(monday)
+    setSelectedDay(dayIndex)
+    setViewMode("day")
+    setCalendarOpen(false)
+  }
+
   if (!isReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -257,7 +272,28 @@ export function ScheduleApp() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => hapticFeedback("light")}
+                  className="p-1 -m-1 rounded-lg hover:bg-accent active:bg-accent/70 transition-colors"
+                >
+                  <CalendarIcon className="h-5 w-5 text-primary" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start" sideOffset={8}>
+                <Calendar
+                  mode="single"
+                  locale={ru}
+                  selected={selectedDate}
+                  defaultMonth={selectedDate}
+                  onSelect={handleCalendarSelect}
+                  weekStartsOn={1}
+                  showOutsideDays
+                />
+              </PopoverContent>
+            </Popover>
             <div>
               <h1 className="font-semibold text-foreground leading-none">Расписание</h1>
               {selectedGroupName && (
