@@ -143,6 +143,48 @@ export type Database = {
           settings?: Record<string, unknown> | null
         }
       }
+      user_login_history: {
+        Row: {
+          id: number
+          user_id: number
+          device_id: string | null
+          ip: string | null
+          created_at: string
+        }
+        Insert: {
+          user_id: number
+          device_id?: string | null
+          ip?: string | null
+          created_at?: string
+        }
+        Update: {
+          user_id?: number
+          device_id?: string | null
+          ip?: string | null
+          created_at?: string
+        }
+      }
+      user_change_history: {
+        Row: {
+          id: number
+          user_id: number
+          type: string
+          changes: Record<string, unknown>[]
+          created_at: string
+        }
+        Insert: {
+          user_id: number
+          type: string
+          changes: Record<string, unknown>[]
+          created_at?: string
+        }
+        Update: {
+          user_id?: number
+          type?: string
+          changes?: Record<string, unknown>[]
+          created_at?: string
+        }
+      }
       cache: {
         Row: {
           key: string
