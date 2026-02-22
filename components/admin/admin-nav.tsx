@@ -14,7 +14,9 @@ interface AdminNavProps {
 const navItems = [
   { href: '/admin', label: 'Дашборд' },
   { href: '/admin/users', label: 'Пользователи' },
+  { href: '/admin/chats', label: 'Чаты' },
   { href: '/admin/admins', label: 'Администраторы' },
+  { href: '/admin/settings', label: 'Настройки' },
 ]
 
 export function AdminNav({ email, displayName, role }: AdminNavProps) {
