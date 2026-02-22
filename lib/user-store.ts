@@ -98,6 +98,8 @@ export type UserSummary = {
 }
 
 const MAX_DEVICES = 40
+const MAX_LOGIN_HISTORY = 100
+const MAX_CHANGE_HISTORY = 100
 
 function buildDisplayName(user: StoredUser): string {
   const nameParts = [user.firstName, user.lastName].filter(Boolean)
@@ -108,7 +110,9 @@ function buildDisplayName(user: StoredUser): string {
 
 function mapDbUserToStoredUser(
   dbUser: any,
-  devices: UserDevice[] = []
+  devices: UserDevice[] = [],
+  loginHistory: UserLoginEvent[] = [],
+  changeHistory: UserChangeEvent[] = []
 ): StoredUser {
   return {
     id: dbUser.id,
@@ -139,8 +143,8 @@ function mapDbUserToStoredUser(
       lastSeenAt: d.lastSeenAt,
       settings: d.settings,
     })),
-    loginHistory: [],
-    changeHistory: [],
+    loginHistory,
+    changeHistory,
   }
 }
 
@@ -158,6 +162,98 @@ function mapDbDeviceToUserDevice(dbDevice: any): UserDevice {
     lastSeenAt: dbDevice.last_seen_at,
     settings: dbDevice.settings as UserSettings | null,
   }
+}
+
+function mapDbLoginEvent(row: any): UserLoginEvent {
+  return {
+    at: row.created_at,
+    deviceId: row.device_id,
+    ip: row.ip,
+  }
+}
+
+function mapDbChangeEvent(row: any): UserChangeEvent {
+  const changes = Array.isArray(row.changes) ? row.changes : []
+  return {
+    at: row.created_at,
+    type: row.type as "profile" | "settings",
+    changes: changes.map((c: any) => ({
+      field: c.field ?? "",
+      before: c.before ?? null,
+      after: c.after ?? null,
+    })),
+  }
+}
+
+type ProfileFields = {
+  first_name: string
+  last_name: string | null
+  username: string | null
+  photo_url: string | null
+  language_code: string | null
+  is_premium: boolean | null
+  added_to_attachment_menu: boolean | null
+  allows_write_to_pm: boolean | null
+  is_bot: boolean | null
+}
+
+const PROFILE_FIELD_LABELS: Record<keyof ProfileFields, string> = {
+  first_name: "Имя",
+  last_name: "Фамилия",
+  username: "Username",
+  photo_url: "Фото",
+  language_code: "Язык",
+  is_premium: "Премиум",
+  added_to_attachment_menu: "Меню вложений",
+  allows_write_to_pm: "Можно писать в ЛС",
+  is_bot: "Бот",
+}
+
+const SETTINGS_FIELD_LABELS: Record<string, string> = {
+  facultySlug: "Факультет (slug)",
+  facultyName: "Факультет",
+  groupSlug: "Группа (slug)",
+  groupName: "Группа",
+  course: "Курс",
+  weekType: "Тип недели",
+  notificationsEnabled: "Уведомления",
+  notificationTime: "Время уведомлений",
+  sendDayBefore: "За день до",
+  sendDayOf: "В день пар",
+  notifyNoLessons: "Об отсутствии пар",
+  notifyHolidays: "Праздники (за день)",
+  notifyVacations: "Каникулы (за день)",
+  notifyWeekStart: "Начало недели",
+  notifyHolidayDay: "В день праздника",
+  theme: "Тема",
+}
+
+function stringify(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === "boolean") return value ? "Да" : "Нет"
+  return String(value)
+}
+
+function diffFields<T extends Record<string, unknown>>(
+  oldObj: T | null | undefined,
+  newObj: T | null | undefined,
+  labels: Record<string, string>
+): UserChangeEntry[] {
+  if (!newObj) return []
+  const entries: UserChangeEntry[] = []
+  const keys = Object.keys(labels)
+  for (const key of keys) {
+    const oldVal = oldObj ? (oldObj as any)[key] : undefined
+    const newVal = (newObj as any)[key]
+    if (oldVal !== newVal && stringify(oldVal) !== stringify(newVal)) {
+      entries.push({
+        field: labels[key] ?? key,
+        before: stringify(oldVal),
+        after: stringify(newVal),
+      })
+    }
+  }
+  return entries
 }
 
 import { createHash } from "crypto"
@@ -262,14 +358,30 @@ export async function getUserById(userId: number): Promise<StoredUser | null> {
 
   if (!user) return null
 
-  const { data: devices } = await supabase
-    .from("user_devices")
-    .select()
-    .eq("user_id", userId)
+  const [devicesResult, loginResult, changeResult] = await Promise.all([
+    supabase
+      .from("user_devices")
+      .select()
+      .eq("user_id", userId),
+    supabase
+      .from("user_login_history")
+      .select()
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(MAX_LOGIN_HISTORY),
+    supabase
+      .from("user_change_history")
+      .select()
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(MAX_CHANGE_HISTORY),
+  ])
 
-  const mappedDevices = devices?.map(mapDbDeviceToUserDevice) || []
+  const mappedDevices = devicesResult.data?.map(mapDbDeviceToUserDevice) || []
+  const loginHistory = loginResult.data?.map(mapDbLoginEvent) || []
+  const changeHistory = changeResult.data?.map(mapDbChangeEvent) || []
 
-  return mapDbUserToStoredUser(user, mappedDevices)
+  return mapDbUserToStoredUser(user, mappedDevices, loginHistory, changeHistory)
 }
 
 export async function upsertUser(payload: {
@@ -279,6 +391,13 @@ export async function upsertUser(payload: {
   ip?: string | null
 }): Promise<StoredUser> {
   const now = new Date().toISOString()
+
+  // Fetch existing user to detect changes
+  const { data: existingUser } = await supabase
+    .from("users")
+    .select()
+    .eq("id", payload.user.id)
+    .single()
 
   const userData = {
     id: payload.user.id,
@@ -291,7 +410,7 @@ export async function upsertUser(payload: {
     added_to_attachment_menu: payload.user.added_to_attachment_menu ?? null,
     allows_write_to_pm: payload.user.allows_write_to_pm ?? null,
     is_bot: payload.user.is_bot ?? null,
-    settings: payload.settings ?? null,
+    settings: payload.settings ?? existingUser?.settings ?? null,
     updated_at: now,
     last_seen_at: now,
   }
@@ -302,7 +421,40 @@ export async function upsertUser(payload: {
     .select()
     .single()
 
-  await upsertDevice(payload.user.id, payload.device, now, payload.settings ?? null)
+  const { deviceId } = await upsertDevice(
+    payload.user.id,
+    payload.device,
+    now,
+    payload.settings ?? null
+  )
+
+  // Record login event
+  await recordLoginEvent(payload.user.id, deviceId, payload.ip ?? null, now)
+
+  // Track profile changes
+  if (existingUser) {
+    const profileChanges = diffFields(
+      existingUser as ProfileFields,
+      userData as unknown as ProfileFields,
+      PROFILE_FIELD_LABELS
+    )
+    if (profileChanges.length > 0) {
+      await recordChangeEvent(payload.user.id, "profile", profileChanges, now)
+    }
+
+    // Track settings changes
+    if (payload.settings) {
+      const oldSettings = existingUser.settings as UserSettings | null
+      const settingsChanges = diffFields(
+        oldSettings as any,
+        payload.settings as any,
+        SETTINGS_FIELD_LABELS
+      )
+      if (settingsChanges.length > 0) {
+        await recordChangeEvent(payload.user.id, "settings", settingsChanges, now)
+      }
+    }
+  }
 
   const { data: devices } = await supabase
     .from("user_devices")
@@ -312,6 +464,64 @@ export async function upsertUser(payload: {
   const mappedDevices = devices?.map(mapDbDeviceToUserDevice) || []
 
   return mapDbUserToStoredUser(user, mappedDevices)
+}
+
+async function recordLoginEvent(
+  userId: number,
+  deviceId: string | null,
+  ip: string | null,
+  now: string
+): Promise<void> {
+  await supabase.from("user_login_history").insert({
+    user_id: userId,
+    device_id: deviceId,
+    ip,
+    created_at: now,
+  })
+
+  // Trim old entries beyond limit
+  const { data: rows } = await supabase
+    .from("user_login_history")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+
+  if (rows && rows.length > MAX_LOGIN_HISTORY) {
+    const idsToDelete = rows.slice(MAX_LOGIN_HISTORY).map((r: any) => r.id)
+    await supabase
+      .from("user_login_history")
+      .delete()
+      .in("id", idsToDelete)
+  }
+}
+
+async function recordChangeEvent(
+  userId: number,
+  type: "profile" | "settings",
+  changes: UserChangeEntry[],
+  now: string
+): Promise<void> {
+  await supabase.from("user_change_history").insert({
+    user_id: userId,
+    type,
+    changes: changes as any,
+    created_at: now,
+  })
+
+  // Trim old entries beyond limit
+  const { data: rows } = await supabase
+    .from("user_change_history")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+
+  if (rows && rows.length > MAX_CHANGE_HISTORY) {
+    const idsToDelete = rows.slice(MAX_CHANGE_HISTORY).map((r: any) => r.id)
+    await supabase
+      .from("user_change_history")
+      .delete()
+      .in("id", idsToDelete)
+  }
 }
 
 export async function listUserSummaries(): Promise<UserSummary[]> {
