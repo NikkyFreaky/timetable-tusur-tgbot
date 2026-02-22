@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Calendar, Settings, Sparkles } from "lucide-react"
+import { Calendar as CalendarIcon, Settings, Sparkles, AlertCircle, RefreshCw } from "lucide-react"
+import { ru } from "react-day-picker/locale"
 import { cn } from "@/lib/utils"
 import { DAY_NAMES, type DaySchedule, type SpecialPeriod } from "@/lib/schedule-types"
 import {
@@ -17,6 +18,8 @@ import {
 } from "@/lib/schedule-data"
 import { useSettings } from "@/lib/settings-store"
 import { useTelegram } from "@/lib/telegram-context"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { WeekToggle } from "./week-toggle"
 import { DaySelector } from "./day-selector"
 import { DayView } from "./day-view"
@@ -114,10 +117,12 @@ export function ScheduleApp() {
   const [selectedDay, setSelectedDay] = useState(currentDayIndex)
   const [currentTime, setCurrentTime] = useState(() => formatTime(getTomskNow()))
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"day" | "upcoming">("day")
   const [schedule, setSchedule] = useState<DaySchedule[]>(() => buildEmptySchedule())
   const [isScheduleLoading, setIsScheduleLoading] = useState(false)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const [apiWeekType, setApiWeekType] = useState<"even" | "odd" | null>(null)
   
   const isPrivateChat = chat?.type === "private"
@@ -191,7 +196,8 @@ export function ScheduleApp() {
       })
 
     return () => controller.abort()
-  }, [selectedMonday, settings.facultySlug, settings.groupSlug])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonday, settings.facultySlug, settings.groupSlug, retryCount])
 
   const selectedDaySchedule = useMemo(() => {
     return schedule.find((d) => d.dayIndex === selectedDay) || {
@@ -243,6 +249,22 @@ export function ScheduleApp() {
     setViewMode("day")
   }
 
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (!date) return
+    hapticFeedback("medium")
+    const monday = getMondayOfWeek(date)
+    const dayIndex = getDayIndex(date)
+    setSelectedMonday(monday)
+    setSelectedDay(dayIndex)
+    setViewMode("day")
+    setCalendarOpen(false)
+  }
+
+  const handleRetry = () => {
+    hapticFeedback("light")
+    setRetryCount((c) => c + 1)
+  }
+
   if (!isReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -257,7 +279,28 @@ export function ScheduleApp() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => hapticFeedback("light")}
+                  className="p-1 -m-1 rounded-lg hover:bg-accent active:bg-accent/70 transition-colors"
+                >
+                  <CalendarIcon className="h-5 w-5 text-primary" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start" sideOffset={8}>
+                <Calendar
+                  mode="single"
+                  locale={ru}
+                  selected={selectedDate}
+                  defaultMonth={selectedDate}
+                  onSelect={handleCalendarSelect}
+                  weekStartsOn={1}
+                  showOutsideDays
+                />
+              </PopoverContent>
+            </Popover>
             <div>
               <h1 className="font-semibold text-foreground leading-none">Расписание</h1>
               {selectedGroupName && (
@@ -343,7 +386,21 @@ export function ScheduleApp() {
             />
 
              {scheduleError ? (
-               <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
+               <div className="flex flex-col items-center justify-center py-12 px-4 text-center min-h-[320px]">
+                 <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                   <AlertCircle className="h-8 w-8 text-destructive" />
+                 </div>
+                 <h3 className="font-semibold text-lg text-foreground mb-1">Ошибка загрузки</h3>
+                 <p className="text-sm text-muted-foreground mb-4">{scheduleError}</p>
+                 <button
+                   type="button"
+                   onClick={handleRetry}
+                   className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 active:bg-primary/30 transition-colors"
+                 >
+                   <RefreshCw className="h-4 w-4" />
+                   Попробовать снова
+                 </button>
+               </div>
              ) : isScheduleLoading ? (
                <CenteredLoader label="Загрузка расписания..." className="min-h-[320px]" />
              ) : (
@@ -401,7 +458,21 @@ export function ScheduleApp() {
             </div>
 
              {scheduleError ? (
-               <div className="px-4 py-2 text-sm text-destructive">{scheduleError}</div>
+               <div className="flex flex-col items-center justify-center py-12 px-4 text-center min-h-[320px]">
+                 <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                   <AlertCircle className="h-8 w-8 text-destructive" />
+                 </div>
+                 <h3 className="font-semibold text-lg text-foreground mb-1">Ошибка загрузки</h3>
+                 <p className="text-sm text-muted-foreground mb-4">{scheduleError}</p>
+                 <button
+                   type="button"
+                   onClick={handleRetry}
+                   className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 active:bg-primary/30 transition-colors"
+                 >
+                   <RefreshCw className="h-4 w-4" />
+                   Попробовать снова
+                 </button>
+               </div>
              ) : isScheduleLoading ? (
                <CenteredLoader label="Загрузка расписания..." className="min-h-[320px]" />
              ) : (
