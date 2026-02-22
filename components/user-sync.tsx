@@ -18,6 +18,19 @@ type ChatResponse = {
   }
 }
 
+function getSyncScope(
+  userId: number | undefined,
+  chatId: number | undefined,
+  chatType: string | undefined
+): 'user' | 'chat' | null {
+  const isValidUserId = typeof userId === 'number' && Number.isFinite(userId)
+  const isChatScope = Boolean(chatId && chatType && chatType !== 'private')
+
+  if (isChatScope) return 'chat'
+  if (isValidUserId) return 'user'
+  return null
+}
+
 function hasMeaningfulSettings(settings: UserSettings | null | undefined): boolean {
   return Boolean(settings?.facultySlug || settings?.groupSlug || settings?.course)
 }
@@ -38,13 +51,12 @@ export function UserSync() {
   }, [settings])
 
   useEffect(() => {
-    const isChatScope = Boolean(chat?.id && chat?.type && chat.type !== "private")
-    const scope: "user" | "chat" | null = isChatScope ? "chat" : user?.id ? "user" : null
+    const scope = getSyncScope(user?.id, chat?.id, chat?.type)
     const scopeKey =
-      scope === "chat"
-        ? `chat:${chat?.id ?? "unknown"}`
-        : scope === "user"
-          ? `user:${user?.id ?? "unknown"}`
+      scope === 'chat'
+        ? `chat:${chat?.id ?? 'unknown'}`
+        : scope === 'user'
+          ? `user:${user?.id ?? 'unknown'}`
           : null
 
     if (lastScopeRef.current !== scopeKey) {
@@ -52,12 +64,12 @@ export function UserSync() {
       resetSettings()
     }
 
-    if (scope === "chat" && !chat?.id) {
+    if (scope === 'chat' && !chat?.id) {
       setRemoteReady(false)
       return
     }
 
-    if (scope === "user" && !user?.id) {
+    if (scope === 'user' && !user?.id) {
       setRemoteReady(false)
       return
     }
@@ -66,13 +78,22 @@ export function UserSync() {
     setRemoteReady(false)
 
     const endpoint =
-      scope === "chat" && chat?.id ? `/api/chats/${chat.id}` : `/api/users/${user?.id}`
+      scope === 'chat' && chat?.id
+        ? `/api/chats/${chat.id}`
+        : scope === 'user' && user?.id
+          ? `/api/users/${user.id}`
+          : null
+
+    if (!endpoint) {
+      setRemoteReady(false)
+      return
+    }
 
     fetch(endpoint)
       .then(async (response) => {
         if (!response.ok) return null
         const data = (await response.json()) as UserResponse | ChatResponse
-        if (scope === "chat") {
+        if (scope === 'chat') {
           return (data as ChatResponse).chat?.settings ?? null
         }
         return (data as UserResponse).user?.settings ?? null
@@ -126,8 +147,7 @@ export function UserSync() {
   }
 
   useEffect(() => {
-    const isChatScope = Boolean(chat?.id && chat?.type && chat.type !== "private")
-    const scope: "user" | "chat" | null = isChatScope ? "chat" : user?.id ? "user" : null
+    const scope = getSyncScope(user?.id, chat?.id, chat?.type)
     if (!scope || !remoteReady) return
 
     const controller = new AbortController()
