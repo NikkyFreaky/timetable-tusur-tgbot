@@ -20,12 +20,38 @@ export default function AdminResetPasswordPage() {
     const initRecoverySession = async () => {
       try {
         const supabase = createSupabaseBrowserClient()
+
+        // Method 1: token_hash in query params (from custom email template)
+        const urlParams = new URLSearchParams(window.location.search)
+        const tokenHash = urlParams.get('token_hash')
+        const queryType = urlParams.get('type')
+
+        if (tokenHash && queryType === 'recovery') {
+          const { error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery',
+          })
+
+          if (verifyError) {
+            if (!cancelled) setError('Ссылка для восстановления недействительна или устарела')
+            return
+          }
+
+          window.history.replaceState(null, '', window.location.pathname)
+
+          if (!cancelled) {
+            setValidRecovery(true)
+          }
+          return
+        }
+
+        // Method 2: access_token in hash fragment (from default Supabase template)
         const hashParams = new URLSearchParams(window.location.hash.slice(1))
         const accessToken = hashParams.get('access_token')
         const refreshToken = hashParams.get('refresh_token')
-        const recoveryType = hashParams.get('type')
+        const hashType = hashParams.get('type')
 
-        if (accessToken && refreshToken && recoveryType === 'recovery') {
+        if (accessToken && refreshToken && hashType === 'recovery') {
           const { error: setSessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
@@ -37,8 +63,14 @@ export default function AdminResetPasswordPage() {
           }
 
           window.history.replaceState(null, '', window.location.pathname)
+
+          if (!cancelled) {
+            setValidRecovery(true)
+          }
+          return
         }
 
+        // No recovery tokens found — check if already has a session
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!cancelled) {
