@@ -379,7 +379,7 @@ function parseWeekSchedule(
   while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
     const rowHtml = rowMatch[1]
     const timeMatch = rowHtml.match(
-      /<th[^>]*class=['"]time['"][^>]*>[\s\S]*?<span>\s*(\d{1,2}:\d{2})\s*<\/span>[\s\S]*?<span>\s*(\d{1,2}:\d{2})\s*<\/span>/i
+      /<th[^>]*class=['"][^'"]*\btime\b[^'"]*['"][^>]*>[\s\S]*?<span>\s*(\d{1,2}:\d{2})\s*<\/span>[\s\S]*?<span>\s*(\d{1,2}:\d{2})\s*<\/span>/i
     )
 
     const timeStart = timeMatch?.[1]
