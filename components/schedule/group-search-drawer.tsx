@@ -13,11 +13,11 @@ import {
 import type { FacultyOption, CourseOption } from '@/lib/timetable-types'
 import { Input } from '@/components/ui/input'
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer'
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface GroupSearchDrawerProps {
@@ -146,11 +146,11 @@ export function GroupSearchDrawer({
   const hasQuery = query.trim().length > 0
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-h-[85vh]">
-        <DrawerHeader className="pb-2">
-          <DrawerTitle>Поиск группы</DrawerTitle>
-        </DrawerHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0">
+        <SheetHeader className="px-4 pb-4 border-b border-border">
+          <SheetTitle className="text-lg mx-auto">Поиск группы</SheetTitle>
+        </SheetHeader>
 
         {/* Search input */}
         <div className="px-4 pb-3">
@@ -267,7 +267,7 @@ export function GroupSearchDrawer({
             </div>
           )}
         </ScrollArea>
-      </DrawerContent>
-    </Drawer>
+      </SheetContent>
+    </Sheet>
   )
 }
