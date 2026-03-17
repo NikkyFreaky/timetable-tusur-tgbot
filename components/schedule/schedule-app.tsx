@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Calendar as CalendarIcon, Settings, Sparkles, AlertCircle, RefreshCw } from "lucide-react"
+import { Calendar as CalendarIcon, Settings, Search, ChevronLeft, Sparkles, AlertCircle, RefreshCw } from "lucide-react"
 import { ru } from "react-day-picker/locale"
 import { cn } from "@/lib/utils"
 import { DAY_NAMES, type DaySchedule, type SpecialPeriod } from "@/lib/schedule-types"
@@ -25,6 +25,8 @@ import { DaySelector } from "./day-selector"
 import { DayView } from "./day-view"
 import { UpcomingClasses } from "./upcoming-classes"
 import { SettingsPanel } from "./settings-panel"
+import { GroupSearchDrawer } from "./group-search-drawer"
+import type { GroupSearchMatch } from "@/lib/group-search"
 import { CenteredLoader } from "@/components/ui/centered-loader"
 
 const buildEmptySchedule = (): DaySchedule[] =>
@@ -117,6 +119,12 @@ export function ScheduleApp() {
   const [selectedDay, setSelectedDay] = useState(currentDayIndex)
   const [currentTime, setCurrentTime] = useState(() => formatTime(getTomskNow()))
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [previewGroup, setPreviewGroup] = useState<{
+    facultySlug: string
+    groupSlug: string
+    groupName: string
+  } | null>(null)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"day" | "upcoming">("day")
   const [schedule, setSchedule] = useState<DaySchedule[]>(() => buildEmptySchedule())
@@ -127,6 +135,11 @@ export function ScheduleApp() {
   
   const isPrivateChat = chat?.type === "private"
   const isGroupChat = chat?.type === "group" || chat?.type === "supergroup"
+
+  // Active group: preview group takes priority over settings
+  const activeFaculty = previewGroup?.facultySlug ?? settings.facultySlug
+  const activeGroup = previewGroup?.groupSlug ?? settings.groupSlug
+  const isPreviewMode = previewGroup !== null
 
   // Derived state - week type is calculated from selected monday
   const computedWeekType = useMemo(() => getWeekType(selectedMonday), [selectedMonday])
@@ -155,7 +168,7 @@ export function ScheduleApp() {
   }, [weekType, settings.weekType, updateSettings])
 
   useEffect(() => {
-    if (!settings.facultySlug || !settings.groupSlug) {
+    if (!activeFaculty || !activeGroup) {
       setSchedule(buildEmptySchedule())
       setScheduleError(null)
       setApiWeekType(null)
@@ -170,7 +183,7 @@ export function ScheduleApp() {
     setApiWeekType(null)
 
     fetch(
-      `/api/timetable?faculty=${settings.facultySlug}&group=${settings.groupSlug}&weekStart=${weekStart}`,
+      `/api/timetable?faculty=${activeFaculty}&group=${activeGroup}&weekStart=${weekStart}`,
       { signal: controller.signal }
     )
       .then(async (response) => {
@@ -197,7 +210,7 @@ export function ScheduleApp() {
 
     return () => controller.abort()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMonday, settings.facultySlug, settings.groupSlug, retryCount])
+  }, [selectedMonday, activeFaculty, activeGroup, retryCount])
 
   const selectedDaySchedule = useMemo(() => {
     return schedule.find((d) => d.dayIndex === selectedDay) || {
@@ -223,7 +236,7 @@ export function ScheduleApp() {
     })
   }, [schedule])
 
-  const selectedGroupName = settings.groupName
+  const selectedGroupName = previewGroup?.groupName ?? settings.groupName
 
   // Week navigation handlers
   const handlePrevWeek = () => {
@@ -262,6 +275,19 @@ export function ScheduleApp() {
     setCalendarOpen(false)
   }
 
+  const handleSelectPreviewGroup = (match: GroupSearchMatch) => {
+    setPreviewGroup({
+      facultySlug: match.facultySlug,
+      groupSlug: match.groupSlug,
+      groupName: match.groupName,
+    })
+  }
+
+  const handleExitPreview = () => {
+    hapticFeedback("light")
+    setPreviewGroup(null)
+  }
+
   const handleRetry = () => {
     hapticFeedback("light")
     setRetryCount((c) => c + 1)
@@ -280,46 +306,92 @@ export function ScheduleApp() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
+          {isPreviewMode ? (
+            /* Preview mode header */
+            <>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => hapticFeedback("light")}
+                  onClick={handleExitPreview}
                   className="p-1 -m-1 rounded-lg hover:bg-accent active:bg-accent/70 transition-colors"
                 >
-                  <CalendarIcon className="h-5 w-5 text-primary" />
+                  <ChevronLeft className="h-5 w-5 text-primary" />
                 </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start" sideOffset={8}>
-                <Calendar
-                  mode="single"
-                  locale={ru}
-                  selected={selectedDate}
-                  defaultMonth={selectedDate}
-                  onSelect={handleCalendarSelect}
-                  weekStartsOn={1}
-                  showOutsideDays
-                />
-              </PopoverContent>
-            </Popover>
-            <div>
-              <h1 className="font-semibold text-foreground leading-none">Расписание</h1>
-              {selectedGroupName && (
-                <p className="text-xs text-muted-foreground mt-0.5">Группа {selectedGroupName}</p>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback("light")
-              setSettingsOpen(true)
-            }}
-            className="p-2 rounded-full hover:bg-accent active:bg-accent/70 transition-colors"
-          >
-            <Settings className="h-5 w-5 text-muted-foreground" />
-          </button>
+                <div>
+                  <h1 className="font-semibold text-foreground leading-none">Просмотр</h1>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Группа {previewGroup.groupName}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  hapticFeedback("light")
+                  setSearchOpen(true)
+                }}
+                className="p-2 rounded-full hover:bg-accent active:bg-accent/70 transition-colors"
+              >
+                <Search className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </>
+          ) : (
+            /* Normal mode header */
+            <>
+              <div className="flex items-center gap-2">
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => hapticFeedback("light")}
+                      className="p-1 -m-1 rounded-lg hover:bg-accent active:bg-accent/70 transition-colors"
+                    >
+                      <CalendarIcon className="h-5 w-5 text-primary" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" sideOffset={8}>
+                    <Calendar
+                      mode="single"
+                      locale={ru}
+                      selected={selectedDate}
+                      defaultMonth={selectedDate}
+                      onSelect={handleCalendarSelect}
+                      weekStartsOn={1}
+                      showOutsideDays
+                    />
+                  </PopoverContent>
+                </Popover>
+                <div>
+                  <h1 className="font-semibold text-foreground leading-none">Расписание</h1>
+                  {selectedGroupName && (
+                    <p className="text-xs text-muted-foreground mt-0.5">Группа {selectedGroupName}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    hapticFeedback("light")
+                    setSearchOpen(true)
+                  }}
+                  className="p-2 rounded-full hover:bg-accent active:bg-accent/70 transition-colors"
+                >
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    hapticFeedback("light")
+                    setSettingsOpen(true)
+                  }}
+                  className="p-2 rounded-full hover:bg-accent active:bg-accent/70 transition-colors"
+                >
+                  <Settings className="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Week Navigation - only show in private chats */}
@@ -532,7 +604,7 @@ export function ScheduleApp() {
       </main>
 
       {/* No Group Selected Notice */}
-      {!settings.groupSlug && (
+      {!settings.groupSlug && !isPreviewMode && (
         <div className="sticky bottom-0 bg-primary/10 border-t border-primary/20 p-4">
           <button
             type="button"
@@ -557,6 +629,13 @@ export function ScheduleApp() {
         onResetSettings={resetSettings}
         scopeLabel={scopeLabel}
         userId={user?.id}
+      />
+
+      {/* Group Search Drawer */}
+      <GroupSearchDrawer
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onSelectGroup={handleSelectPreviewGroup}
       />
     </div>
   )
