@@ -13,6 +13,7 @@ import type { StoredChat } from "@/lib/chat-store"
 import type { ChatTopic } from "@/lib/schedule-types"
 import { useTelegram } from "@/lib/telegram-context"
 import type { CourseOption, FacultyOption, GroupOption } from "@/lib/timetable-types"
+import { type GroupSearchMatch, normalizeSearchValue, buildGroupSearchMatches } from "@/lib/group-search"
 
 interface SettingsPanelProps {
   open: boolean
@@ -54,16 +55,7 @@ const WHEEL_ITEM_HEIGHT = 44
 const WHEEL_VISIBLE_ITEMS = 5
 const WHEEL_CONTAINER_HEIGHT = WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ITEMS
 
-interface GroupSearchMatch {
-  facultySlug: string
-  facultyName: string
-  courseNumber: number
-  groupSlug: string
-  groupName: string
-}
 
-const normalizeSearchValue = (value: string) =>
-  value.toLocaleLowerCase("ru-RU").replace(/\s+/g, "")
 
 export function SettingsPanel({
   open,
@@ -734,53 +726,13 @@ export function SettingsPanel({
   const hours = Array.from({ length: 24 }, (_, index) => index)
   const minutes = Array.from({ length: 60 }, (_, index) => index)
 
-  const buildGroupSearchMatches = (normalizedQuery: string): GroupSearchMatch[] => {
-    if (!normalizedQuery) return []
-
-    const matches: GroupSearchMatch[] = []
-
-    faculties.forEach((faculty) => {
-      const courses = coursesByFaculty[faculty.slug] || []
-
-      courses.forEach((course) => {
-        course.groups.forEach((group) => {
-          if (normalizeSearchValue(group.name).includes(normalizedQuery)) {
-            matches.push({
-              facultySlug: faculty.slug,
-              facultyName: faculty.name,
-              courseNumber: course.number,
-              groupSlug: group.slug,
-              groupName: group.name,
-            })
-          }
-        })
-      })
-    })
-
-    return matches.sort((first, second) => {
-      const firstStartsWith = normalizeSearchValue(first.groupName).startsWith(normalizedQuery)
-      const secondStartsWith = normalizeSearchValue(second.groupName).startsWith(normalizedQuery)
-
-      if (firstStartsWith !== secondStartsWith) {
-        return firstStartsWith ? -1 : 1
-      }
-
-      const byName = first.groupName.localeCompare(second.groupName, "ru")
-      if (byName !== 0) {
-        return byName
-      }
-
-      return first.courseNumber - second.courseNumber
-    })
-  }
-
   const personalGroupSearchMatches = useMemo(
-    () => buildGroupSearchMatches(normalizedPersonalGroupSearchQuery),
+    () => buildGroupSearchMatches(normalizedPersonalGroupSearchQuery, faculties, coursesByFaculty),
     [normalizedPersonalGroupSearchQuery, faculties, coursesByFaculty]
   )
 
   const groupSettingsSearchMatches = useMemo(
-    () => buildGroupSearchMatches(normalizedGroupSettingsSearchQuery),
+    () => buildGroupSearchMatches(normalizedGroupSettingsSearchQuery, faculties, coursesByFaculty),
     [normalizedGroupSettingsSearchQuery, faculties, coursesByFaculty]
   )
 
