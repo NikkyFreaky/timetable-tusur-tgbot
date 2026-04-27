@@ -30,6 +30,8 @@ export interface Lesson {
   jointGroupLinks?: ResourceLink[]
   resourceLinks?: ResourceLink[]
   notes?: string[]
+  isCancelled?: boolean
+  cancellationReason?: string
 }
 
 export interface DaySchedule {
