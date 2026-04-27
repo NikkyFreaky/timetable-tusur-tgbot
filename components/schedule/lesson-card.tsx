@@ -34,6 +34,7 @@ export function LessonCard({
   const { building, roomLabel } = parseRoom(lesson.room)
   const buildingStyle = building ? BUILDING_STYLES[building] : null
   const hasNotes = Boolean(lesson.notes && lesson.notes.length > 0)
+  const isCancelled = lesson.isCancelled === true
 
   const handlePress = () => {
     hapticFeedback("medium")
@@ -48,6 +49,7 @@ export function LessonCard({
           "relative rounded-xl transition-all duration-200 active:scale-[0.98] cursor-pointer",
           isCompact ? "p-3" : "p-4",
           "bg-card border border-border",
+          isCancelled && "border-red-300/70 bg-red-50/50",
           isActive && "ring-2 ring-primary shadow-lg",
           isNext && "border-primary/50 bg-primary/5"
         )}
@@ -56,7 +58,13 @@ export function LessonCard({
         <div
           className={cn(
             "absolute left-0 top-0 bottom-0 w-1 rounded-l-xl",
-            isActive ? "bg-primary" : isNext ? "bg-primary/50" : "bg-muted"
+            isCancelled
+              ? "bg-red-400"
+              : isActive
+                ? "bg-primary"
+                : isNext
+                  ? "bg-primary/50"
+                  : "bg-muted"
           )}
         />
 
@@ -74,6 +82,11 @@ export function LessonCard({
               <span className="text-xs text-muted-foreground">Пара</span>
             )}
             <div className="flex items-center gap-2">
+              {isCancelled && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                  Отменено
+                </span>
+              )}
               {hasNotes && (
                 <Info className={cn(isCompact ? "h-3.5 w-3.5" : "h-4 w-4", "text-amber-500")} />
               )}
@@ -93,7 +106,8 @@ export function LessonCard({
           <h3
             className={cn(
               "font-semibold text-foreground leading-tight",
-              isCompact ? "text-sm mb-1.5" : "text-base mb-2"
+              isCompact ? "text-sm mb-1.5" : "text-base mb-2",
+              isCancelled && "line-through text-muted-foreground"
             )}
           >
             {lesson.subject}

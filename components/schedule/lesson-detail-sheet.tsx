@@ -30,6 +30,7 @@ export function LessonDetailSheet({ lesson, dayName, open, onOpenChange }: Lesso
   const roomSectionLabel = roomLinks.length > 1 ? "Места проведения" : "Место проведения"
   const instructorLabel = instructorLinks.length > 1 ? "Преподаватели" : "Преподаватель"
   const noteLabel = lesson.notes && lesson.notes.length > 1 ? "Примечания" : "Примечание"
+  const isCancelled = lesson.isCancelled === true
   const { building, roomLabel } = parseRoom(lesson.room)
   const buildingStyle = building ? BUILDING_STYLES[building] : null
   const trimmedRoomLabel = roomLabel.trim()
@@ -60,7 +61,7 @@ export function LessonDetailSheet({ lesson, dayName, open, onOpenChange }: Lesso
             <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
           </div>
           <SheetTitle className="text-left text-lg font-semibold leading-tight pr-4">
-            {lesson.subject}
+            <span className={cn(isCancelled && "line-through text-muted-foreground")}>{lesson.subject}</span>
           </SheetTitle>
         </SheetHeader>
 
@@ -83,6 +84,16 @@ export function LessonDetailSheet({ lesson, dayName, open, onOpenChange }: Lesso
               </div>
             }
           />
+
+          {isCancelled && (
+            <DetailRow
+              icon={<Info className="w-5 h-5 text-red-500" />}
+              label="Статус"
+              value="Занятие отменено"
+              secondaryValue={lesson.cancellationReason}
+              valueClassName="text-red-700"
+            />
+          )}
 
           {/* Notes */}
           {lesson.notes && lesson.notes.length > 0 && (

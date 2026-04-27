@@ -46,6 +46,10 @@ export function UpcomingClasses({
         : "00:00"
 
       for (const lesson of day.lessons) {
+        if (lesson.isCancelled) {
+          continue
+        }
+
         if (dayOffset > 0 || lesson.time > timeNow) {
           upcomingLessons.push({
             ...lesson,
