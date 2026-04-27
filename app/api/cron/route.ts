@@ -81,12 +81,25 @@ function formatDayName(date: Date): string {
   return DAY_NAMES[getDayIndex(date)] ?? ""
 }
 
+function getActiveLessons(schedule: DaySchedule) {
+  return schedule.lessons.filter((lesson) => !lesson.isCancelled)
+}
+
+function getCancelledLessons(schedule: DaySchedule) {
+  return schedule.lessons.filter((lesson) => lesson.isCancelled)
+}
+
 function formatLessonLine(lesson: DaySchedule["lessons"][number], index: number) {
   const typeLabel = LESSON_TYPES[lesson.type]?.label
+  const cancelledPrefix = lesson.isCancelled ? "❌ " : ""
   const lines: string[] = [
     `${index + 1}) ${lesson.time}–${lesson.timeEnd}`,
-    `📚 ${lesson.subject}${typeLabel ? ` (${typeLabel})` : ""}`,
+    `📚 ${cancelledPrefix}${lesson.subject}${typeLabel ? ` (${typeLabel})` : ""}`,
   ]
+
+  if (lesson.isCancelled) {
+    lines.push(`🚫 Статус: занятие отменено${lesson.cancellationReason ? ` (${lesson.cancellationReason})` : ""}`)
+  }
 
   if (lesson.room && lesson.room !== "—") {
     lines.push(`🏫 Ауд.: ${lesson.room}`)
@@ -118,7 +131,17 @@ function buildScheduleMessage(
     lines.push("Пар нет.")
     return lines.join("\n")
   }
+
+  const activeLessons = getActiveLessons(schedule)
+  const cancelledLessons = getCancelledLessons(schedule)
+
   lines.push("")
+
+  if (activeLessons.length === 0 && cancelledLessons.length > 0) {
+    lines.push("Все запланированные занятия на этот день отменены.")
+    lines.push("")
+  }
+
   schedule.lessons.forEach((lesson, index) => {
     lines.push(formatLessonLine(lesson, index))
     if (index < schedule.lessons.length - 1) {
@@ -191,7 +214,7 @@ async function findNextLessons(
   for (let offset = 1; offset <= 60; offset += 1) {
     const date = addDays(startDate, offset)
     const schedule = await getScheduleForDate(facultySlug, groupSlug, date, cache)
-    if (schedule.lessons.length > 0) {
+    if (getActiveLessons(schedule).length > 0) {
       return { date, schedule }
     }
   }
