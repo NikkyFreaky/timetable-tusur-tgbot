@@ -10,7 +10,7 @@ const TUSUR_BASE_URL = "https://tusur.ru"
 const FACULTY_PHOTOS_URL =
   "https://tusur.ru/ru/o-tusure/struktura-i-organy-upravleniya/departament-obrazovaniya/fakultety-i-kafedry"
 const FACULTIES_CACHE_KEY = "faculties"
-const SCHEDULE_CACHE_VERSION = "v2"
+const SCHEDULE_CACHE_VERSION = "v3"
 let facultiesInFlight: Promise<FacultyOption[]> | null = null
 const BASE_WEEK_ID = 786
 
@@ -95,6 +95,18 @@ const NOTE_TOOLTIP_ATTRS = ["data-original-title", "title", "data-title", "data-
 function extractAttributeValue(tag: string, name: string): string | null {
   const match = tag.match(new RegExp(`${name}=['"]([^'"]*)['"]`, "i"))
   return match ? match[1] : null
+}
+
+function extractTooltipText(tag: string): string | null {
+  for (const attr of NOTE_TOOLTIP_ATTRS) {
+    const value = extractAttributeValue(tag, attr)
+    if (value && value.trim()) {
+      const cleaned = stripHtml(value)
+      if (cleaned) return cleaned
+    }
+  }
+
+  return null
 }
 
 function extractLessonNotes(html: string): string[] {
@@ -399,6 +411,28 @@ function parseWeekSchedule(
 
       while ((trainingMatch = trainingRegex.exec(cellHtml)) !== null) {
         const trainingHtml = trainingMatch[0]
+        const trainingTagMatch = trainingHtml.match(/^<div[^>]*>/i)
+        const trainingClassMatch = trainingTagMatch?.[0].match(/class=['"]([^'"]+)['"]/i)
+        const trainingClassList = trainingClassMatch
+          ? trainingClassMatch[1].split(/\s+/).filter(Boolean)
+          : []
+
+        const holidayDescriptionMatch = trainingHtml.match(
+          /<span[^>]*class=['"][^'"]*holiday-description[^'"]*['"][^>]*>[\s\S]*?<\/span>/i
+        )
+        const holidayDescriptionTag = holidayDescriptionMatch?.[0]
+        const holidayDescriptionText = holidayDescriptionTag ? stripHtml(holidayDescriptionTag) : ""
+        const isCancelledByText = holidayDescriptionText
+          .toLowerCase()
+          .includes("занятие отменено")
+        const isCancelled = trainingClassList.includes("holiday") || isCancelledByText
+        const cancellationReasonRaw = holidayDescriptionTag ? extractTooltipText(holidayDescriptionTag) : null
+        const cancellationReason = cancellationReasonRaw
+          ? cancellationReasonRaw
+              .replace(/\s+/g, " ")
+              .replace(/:+\s*$/, "")
+              .trim()
+          : undefined
         const disciplineMatch = trainingHtml.match(
           /<span[^>]*class=['"][^'"]*discipline[^'"]*['"][^>]*>([\s\S]*?)<\/span>/i
         )
@@ -466,6 +500,8 @@ function parseWeekSchedule(
           jointGroupLinks,
           date: dayDates[dayIndex],
           notes: notes.length ? notes : undefined,
+          isCancelled,
+          cancellationReason: cancellationReason || undefined,
         })
       }
     }
