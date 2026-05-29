@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
 import { fetchWeekSchedule } from "@/lib/timetable"
-import type { DaySchedule } from "@/lib/schedule-types"
+import type { DaySchedule, SpecialPeriod } from "@/lib/schedule-types"
 
 type SchedulePayload = {
   weekType: "even" | "odd"
   days: DaySchedule[]
+  specialPeriods: SpecialPeriod[]
   weekStart: string
 }
 
@@ -74,6 +75,7 @@ export async function GET(request: Request) {
       return {
         weekType: schedule.weekType,
         days: schedule.days,
+        specialPeriods: schedule.specialPeriods,
         weekStart,
       }
     })()
