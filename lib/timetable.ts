@@ -1,4 +1,4 @@
-import type { DaySchedule, Lesson, ResourceLink } from "@/lib/schedule-types"
+import type { DaySchedule, Lesson, ResourceLink, SpecialPeriod } from "@/lib/schedule-types"
 import { DAY_NAMES } from "@/lib/schedule-types"
 import type { CourseOption, FacultyOption, GroupOption } from "@/lib/timetable-types"
 import { getWeekType } from "@/lib/schedule-data"
@@ -10,7 +10,7 @@ const TUSUR_BASE_URL = "https://tusur.ru"
 const FACULTY_PHOTOS_URL =
   "https://tusur.ru/ru/o-tusure/struktura-i-organy-upravleniya/departament-obrazovaniya/fakultety-i-kafedry"
 const FACULTIES_CACHE_KEY = "faculties"
-const SCHEDULE_CACHE_VERSION = "v3"
+const SCHEDULE_CACHE_VERSION = "v4"
 let facultiesInFlight: Promise<FacultyOption[]> | null = null
 const BASE_WEEK_ID = 786
 
@@ -310,6 +310,13 @@ function parseTrainingSpecialDay(trainingHtml: string): DaySchedule["specialDay"
     }
   }
 
+  if (text.includes("сесси")) {
+    return {
+      type: "exam",
+      name: rawText || "Экзаменационная сессия",
+    }
+  }
+
   if (text.includes("практик")) {
     return {
       type: "practice",
@@ -318,6 +325,119 @@ function parseTrainingSpecialDay(trainingHtml: string): DaySchedule["specialDay"
   }
 
   return null
+}
+
+const RUSSIAN_MONTHS: Record<string, number> = {
+  января: 0,
+  февраля: 1,
+  марта: 2,
+  апреля: 3,
+  мая: 4,
+  июня: 5,
+  июля: 6,
+  августа: 7,
+  сентября: 8,
+  октября: 9,
+  ноября: 10,
+  декабря: 11,
+}
+
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function parseRussianDate(value: string): Date | null {
+  const normalized = value.replace(/\s+/g, " ").trim().toLowerCase()
+  const match = normalized.match(/(\d{1,2})\s+([а-яё]+)\s+(\d{4})/i)
+  if (!match) return null
+
+  const day = Number(match[1])
+  const month = RUSSIAN_MONTHS[match[2]]
+  const year = Number(match[3])
+  if (!day || month === undefined || !year) return null
+
+  const date = new Date(year, month, day)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function getWeekTileSpecialPeriod(
+  className: string,
+  weekStart: Date
+): Pick<SpecialPeriod, "type" | "name"> | null {
+  if (className.includes("day_color_exam_session")) {
+    const month = weekStart.getMonth()
+    return {
+      type: "exam",
+      name: month >= 4 && month <= 7 ? "Летняя сессия" : "Зимняя сессия",
+    }
+  }
+
+  if (className.includes("day_color_weekend")) {
+    const month = weekStart.getMonth()
+    return {
+      type: "vacation",
+      name: month >= 5 && month <= 7 ? "Летние каникулы" : "Каникулы",
+    }
+  }
+
+  return null
+}
+
+function parseSpecialPeriods(html: string): SpecialPeriod[] {
+  const tiles: Array<{
+    type: SpecialPeriod["type"]
+    name: string
+    startDate: Date
+  }> = []
+  const tileRegex = /<li[^>]*class=['"]([^'"]*\btile\b[^'"]*)['"][^>]*>([\s\S]*?)<\/li>/gi
+  let tileMatch: RegExpExecArray | null
+
+  while ((tileMatch = tileRegex.exec(html)) !== null) {
+    const className = tileMatch[1]
+    const tileHtml = tileMatch[2]
+    const date = parseRussianDate(stripHtml(tileHtml))
+    if (!date) continue
+
+    const period = getWeekTileSpecialPeriod(className, date)
+    if (!period) continue
+
+    tiles.push({
+      ...period,
+      startDate: date,
+    })
+  }
+
+  const periods: SpecialPeriod[] = []
+  for (const tile of tiles) {
+    const previous = periods[periods.length - 1]
+    const startDate = formatDateKey(tile.startDate)
+
+    if (
+      previous &&
+      previous.type === tile.type &&
+      previous.name === tile.name
+    ) {
+      const endDate = new Date(tile.startDate)
+      endDate.setDate(endDate.getDate() + 6)
+      previous.endDate = formatDateKey(endDate)
+      continue
+    }
+
+    const endDate = new Date(tile.startDate)
+    endDate.setDate(endDate.getDate() + 6)
+    periods.push({
+      id: `timetable-${tile.type}-${startDate}`,
+      type: tile.type,
+      name: tile.name,
+      startDate,
+      endDate: formatDateKey(endDate),
+    })
+  }
+
+  return periods
 }
 
 function calculateWeekIdFromDate(date: Date): number {
@@ -759,24 +879,26 @@ export async function fetchWeekSchedule(
   facultySlug: string,
   groupSlug: string,
   weekStart: Date
-): Promise<{ weekType: "even" | "odd"; days: DaySchedule[] }> {
+): Promise<{ weekType: "even" | "odd"; days: DaySchedule[]; specialPeriods: SpecialPeriod[] }> {
   const cacheKey = `schedule:${SCHEDULE_CACHE_VERSION}:${facultySlug}:${groupSlug}:${weekStart.toISOString().split('T')[0]}`
 
-  const cached = await get<{ weekType: "even" | "odd"; days: DaySchedule[] }>(cacheKey)
+  const cached = await get<{ weekType: "even" | "odd"; days: DaySchedule[]; specialPeriods: SpecialPeriod[] }>(cacheKey)
   if (cached) {
     return cached
   }
 
-  const staleData = await getWithStale<{ weekType: "even" | "odd"; days: DaySchedule[] }>(cacheKey)
+  const staleData = await getWithStale<{ weekType: "even" | "odd"; days: DaySchedule[]; specialPeriods: SpecialPeriod[] }>(cacheKey)
 
   try {
     const url = buildTimetableUrl(facultySlug, groupSlug)
     const html = await fetchTimetableHtml(url, weekStart)
     const lessonModals = parseLessonModals(html)
     const schedule = parseWeekSchedule(html, weekStart, lessonModals)
+    const specialPeriods = parseSpecialPeriods(html)
     await hydrateLessonResourceLinks(schedule.days, lessonModals)
-    await set(cacheKey, schedule, CACHE_TTL.SCHEDULE, CACHE_TYPE.SCHEDULE)
-    return schedule
+    const result = { ...schedule, specialPeriods }
+    await set(cacheKey, result, CACHE_TTL.SCHEDULE, CACHE_TYPE.SCHEDULE)
+    return result
   } catch (error) {
     if (staleData) {
       return staleData.value

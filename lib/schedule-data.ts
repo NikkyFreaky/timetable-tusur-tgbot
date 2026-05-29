@@ -6,9 +6,6 @@ export const SPECIAL_PERIODS: SpecialPeriod[] = [
   { id: "mar8", type: "holiday", name: "Международный женский день", startDate: "2026-03-08", endDate: "2026-03-08" },
   { id: "may1", type: "holiday", name: "Праздник Весны и Труда", startDate: "2026-05-01", endDate: "2026-05-01" },
   { id: "may9", type: "holiday", name: "День Победы", startDate: "2026-05-09", endDate: "2026-05-09" },
-  { id: "winter_session", type: "exam", name: "Зимняя сессия", startDate: "2026-01-10", endDate: "2026-01-31" },
-  { id: "summer_session", type: "exam", name: "Летняя сессия", startDate: "2026-06-01", endDate: "2026-06-30" },
-  { id: "summer_vacation", type: "vacation", name: "Летние каникулы", startDate: "2026-07-01", endDate: "2026-08-31" },
 ]
 
 export function getCurrentWeekType(): "even" | "odd" {

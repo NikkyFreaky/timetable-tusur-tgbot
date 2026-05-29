@@ -132,6 +132,7 @@ export function ScheduleApp() {
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [apiWeekType, setApiWeekType] = useState<"even" | "odd" | null>(null)
+  const [timetableSpecialPeriods, setTimetableSpecialPeriods] = useState<SpecialPeriod[]>([])
   
   const isPrivateChat = chat?.type === "private"
   const isGroupChat = chat?.type === "group" || chat?.type === "supergroup"
@@ -149,6 +150,7 @@ export function ScheduleApp() {
   const isCurrentWeek = selectedMonday.getTime() === todayMonday.getTime()
   const isToday = isCurrentWeek && selectedDay === currentDayIndex
   const staticSpecialPeriod = isSpecialPeriod(selectedDate, SPECIAL_PERIODS)
+  const timetableSpecialPeriod = isSpecialPeriod(selectedDate, timetableSpecialPeriods)
 
   // Update current time every minute
   useEffect(() => {
@@ -172,6 +174,7 @@ export function ScheduleApp() {
       setSchedule(buildEmptySchedule())
       setScheduleError(null)
       setApiWeekType(null)
+      setTimetableSpecialPeriods([])
       return
     }
 
@@ -181,6 +184,7 @@ export function ScheduleApp() {
     setIsScheduleLoading(true)
     setScheduleError(null)
     setApiWeekType(null)
+    setTimetableSpecialPeriods([])
 
     fetch(
       `/api/timetable?faculty=${activeFaculty}&group=${activeGroup}&weekStart=${weekStart}`,
@@ -193,16 +197,19 @@ export function ScheduleApp() {
         return (await response.json()) as {
           weekType?: "even" | "odd"
           days?: DaySchedule[]
+          specialPeriods?: SpecialPeriod[]
         }
       })
       .then((data) => {
         setApiWeekType(data.weekType || null)
         setSchedule(normalizeSchedule(data.days || []))
+        setTimetableSpecialPeriods(data.specialPeriods || [])
       })
       .catch((error) => {
         if ((error as { name?: string }).name === "AbortError") return
         setScheduleError("Не удалось загрузить расписание")
         setSchedule(buildEmptySchedule())
+        setTimetableSpecialPeriods([])
       })
       .finally(() => {
         setIsScheduleLoading(false)
@@ -224,8 +231,8 @@ export function ScheduleApp() {
     if (selectedDaySchedule.specialDay) {
       return buildTimetableSpecialPeriod(selectedDate, selectedDaySchedule.specialDay)
     }
-    return staticSpecialPeriod
-  }, [selectedDate, selectedDaySchedule.specialDay, staticSpecialPeriod])
+    return staticSpecialPeriod ?? timetableSpecialPeriod
+  }, [selectedDate, selectedDaySchedule.specialDay, staticSpecialPeriod, timetableSpecialPeriod])
 
   const isNewYearHoliday = specialPeriod?.id === "ny2026"
 
