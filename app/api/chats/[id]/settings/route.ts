@@ -56,6 +56,7 @@ export async function POST(
       sendDayBefore: settings.sendDayBefore ?? chat.settings?.sendDayBefore ?? false,
       sendDayOf: settings.sendDayOf ?? chat.settings?.sendDayOf ?? true,
       notifyNoLessons: settings.notifyNoLessons ?? chat.settings?.notifyNoLessons ?? true,
+      sendNearestLessons: settings.sendNearestLessons ?? chat.settings?.sendNearestLessons ?? false,
       notifyHolidays: settings.notifyHolidays ?? chat.settings?.notifyHolidays ?? false,
       notifyVacations: settings.notifyVacations ?? chat.settings?.notifyVacations ?? false,
       notifyWeekStart: settings.notifyWeekStart ?? chat.settings?.notifyWeekStart ?? false,
