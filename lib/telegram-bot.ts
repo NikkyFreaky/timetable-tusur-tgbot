@@ -75,3 +75,19 @@ export function buildUrlKeyboard(miniAppUrl: string) {
   }
 }
 
+export async function setTelegramCommands(botToken: string) {
+  const response = await fetch(`${TELEGRAM_API}${botToken}/setMyCommands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      commands: [
+        { command: 'start', description: 'Открыть расписание' },
+        { command: 'settings', description: 'Настроить уведомления' },
+        { command: 'info', description: 'Информация о боте' },
+      ],
+    }),
+  })
+  const data = await response.json().catch(() => ({})) as TelegramResponse
+  if (!response.ok || !data.ok) throw new Error(data.description || `HTTP ${response.status}`)
+}
+

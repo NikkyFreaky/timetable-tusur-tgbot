@@ -15,6 +15,7 @@ const navItems = [
   { href: '/admin', label: 'Дашборд' },
   { href: '/admin/users', label: 'Пользователи' },
   { href: '/admin/chats', label: 'Чаты' },
+  { href: '/admin/bot', label: 'Сообщения' },
   { href: '/admin/admins', label: 'Администраторы' },
   { href: '/admin/settings', label: 'Настройки' },
 ]

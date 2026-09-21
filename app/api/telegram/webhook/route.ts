@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import { buildWebAppKeyboard, buildUrlKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
 import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getForumTopics } from "@/lib/telegram-api"
-import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById, markChatMembersInactive } from "@/lib/chat-store"
+import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById, markChatMembersInactive, updateChatBotActive } from "@/lib/chat-store"
+import { updateUserBotActive } from '@/lib/user-store'
+import { getBotMessageTemplate } from '@/lib/bot-message-templates'
 
 export const runtime = "nodejs"
 
@@ -120,9 +122,7 @@ export async function POST(request: Request) {
 
       if (command === "/start") {
         console.log("=== Handling /start command ===", { chatId, isGroup, chatType: message.chat.type, webAppUrl, miniAppUrl })
-        const text = isGroup
-          ? "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) В группе выдайте боту права администратора"
-          : "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) Выберите группу\n3) Включите нужные рассылки"
+        const text = await getBotMessageTemplate('start', isGroup ? 'group' : 'private')
         console.log("=== Sending /start message ===", { text, chatId, isGroup, replyMarkupType: isGroup ? "url" : "web_app" })
         await sendTelegramMessage(botToken, chatId, text, {
           replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
@@ -132,12 +132,19 @@ export async function POST(request: Request) {
 
       if (command === "/settings") {
         console.log("=== Handling /settings command ===", { chatId, isGroup, chatType: message.chat.type, webAppUrl, miniAppUrl })
-        const text = "⚙️ Настройка уведомлений\nОткройте веб-приложение, выберите группу и включите нужные рассылки."
+        const text = await getBotMessageTemplate('settings', isGroup ? 'group' : 'private')
         console.log("=== Sending /settings message ===", { text, chatId, isGroup, replyMarkupType: isGroup ? "url" : "web_app" })
         await sendTelegramMessage(botToken, chatId, text, {
           replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
         })
         console.log("=== /settings message sent successfully ===")
+      }
+
+      if (command === '/info') {
+        const text = await getBotMessageTemplate('info', isGroup ? 'group' : 'private')
+        await sendTelegramMessage(botToken, chatId, text, {
+          replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
+        })
       }
 
       if (isGroup && message.new_chat_members) {
@@ -203,11 +210,15 @@ export async function POST(request: Request) {
         (new_chat_member.status === "member" || new_chat_member.status === "administrator")
 
       if (new_chat_member.status === "left" || new_chat_member.status === "kicked") {
+        await updateChatBotActive(chat.id, false)
+        if (chat.type === 'private') await updateUserBotActive(chat.id, false)
         await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
         await markChatMembersInactive(chat.id)
         const { updateChatsNotificationState } = await import("@/lib/chat-store")
         await updateChatsNotificationState([{ id: chat.id, state: {} }])
       } else if (new_chat_member.status === "member" || new_chat_member.status === "administrator") {
+        await updateChatBotActive(chat.id, true)
+        if (chat.type === 'private') await updateUserBotActive(chat.id, true)
         await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
 
         const chatInfo = await getChat(botToken, chat.id)
