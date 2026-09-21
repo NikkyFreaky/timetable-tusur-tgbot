@@ -66,6 +66,7 @@ export async function listChatsWithSettings(): Promise<StoredChat[]> {
   const { data: chats } = await supabase
     .from("chats")
     .select()
+    .eq('bot_active', true)
 
   if (!chats) return []
 
@@ -125,6 +126,13 @@ export async function updateChatsNotificationState(
       })
       .eq("id", id)
   }
+}
+
+export async function updateChatBotActive(chatId: number, botActive: boolean) {
+  await supabase
+    .from('chats')
+    .update({ bot_active: botActive, updated_at: new Date().toISOString() })
+    .eq('id', chatId)
 }
 
 export async function listUserChats(userId: number): Promise<StoredChat[]> {

@@ -467,6 +467,13 @@ export async function upsertUser(payload: {
   return mapDbUserToStoredUser(user, mappedDevices)
 }
 
+export async function updateUserBotActive(userId: number, botActive: boolean) {
+  await supabase
+    .from('users')
+    .update({ bot_active: botActive, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+}
+
 async function recordLoginEvent(
   userId: number,
   deviceId: string | null,
@@ -556,6 +563,7 @@ export async function listUsersWithSettings(): Promise<StoredUser[]> {
   const { data: users } = await supabase
     .from("users")
     .select()
+    .eq('bot_active', true)
 
   if (!users) return []
 
