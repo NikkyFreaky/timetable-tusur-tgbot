@@ -10,9 +10,22 @@ const TUSUR_BASE_URL = "https://tusur.ru"
 const FACULTY_PHOTOS_URL =
   "https://tusur.ru/ru/o-tusure/struktura-i-organy-upravleniya/departament-obrazovaniya/fakultety-i-kafedry"
 const FACULTIES_CACHE_KEY = "faculties"
-const SCHEDULE_CACHE_VERSION = "v4"
+const SCHEDULE_CACHE_VERSION = "v5"
 let facultiesInFlight: Promise<FacultyOption[]> | null = null
-const BASE_WEEK_ID = 786
+const FALLBACK_WEEK_ID = 842
+const FALLBACK_WEEK_START = new Date(2026, 8, 21)
+const WEEK_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+type CurrentWeek = {
+  id: number
+  start: Date
+}
+
+type CurrentWeekCacheEntry = {
+  expiresAt: number
+  value: Promise<CurrentWeek>
+}
+
+const currentWeekCache = new Map<string, CurrentWeekCacheEntry>()
 
 type LessonModalInfo = {
   courseLinksUrl?: string
@@ -440,16 +453,58 @@ function parseSpecialPeriods(html: string): SpecialPeriod[] {
   return periods
 }
 
-function calculateWeekIdFromDate(date: Date): number {
-  const year = date.getMonth() >= 8 ? date.getFullYear() : date.getFullYear() - 1
-  const startDate = new Date(year, 8, 1)
-  const dayOfWeek = startDate.getDay()
-  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : (8 - dayOfWeek) % 7
-  const firstMonday = new Date(year, 8, 1 + daysUntilMonday)
-  const diffDays = Math.floor((date.getTime() - firstMonday.getTime()) / 86400000)
-  const weeksSinceStart = Math.floor(diffDays / 7)
+function parseCurrentWeek(html: string): CurrentWeek | null {
+  const match = html.match(
+    /<li[^>]*\bcurrent-week\b[^>]*>[\s\S]*?href=['"][^'"]*week_id=(\d+)[^'"]*['"][\s\S]*?с\s*(\d{1,2})\s+([а-я]+)\s+(\d{4})/i
+  )
+  if (!match) return null
 
-  return BASE_WEEK_ID + weeksSinceStart
+  const month = RUSSIAN_MONTHS[match[3].toLowerCase()]
+  if (month === undefined) return null
+
+  return {
+    id: Number(match[1]),
+    start: new Date(Number(match[4]), month, Number(match[2])),
+  }
+}
+
+async function getCurrentWeek(url: string): Promise<CurrentWeek> {
+  const cached = currentWeekCache.get(url)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value
+  }
+
+  const value = (async () => {
+    const response = await fetch(url, { cache: "no-store" })
+    if (!response.ok) {
+      throw new Error(`Failed to fetch current timetable (${response.status})`)
+    }
+
+    return parseCurrentWeek(await response.text()) ?? {
+      id: FALLBACK_WEEK_ID,
+      start: FALLBACK_WEEK_START,
+    }
+  })()
+
+  currentWeekCache.set(url, {
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    value,
+  })
+
+  try {
+    return await value
+  } catch (error) {
+    currentWeekCache.delete(url)
+    throw error
+  }
+}
+
+async function calculateWeekIdFromDate(url: string, date: Date): Promise<number> {
+  const currentWeek = await getCurrentWeek(url)
+  const weeksSinceCurrent = Math.round(
+    (date.getTime() - currentWeek.start.getTime()) / WEEK_DURATION_MS
+  )
+  return currentWeek.id + weeksSinceCurrent
 }
 
 export function buildTimetableUrl(facultySlug: string, groupSlug: string): string {
@@ -457,7 +512,7 @@ export function buildTimetableUrl(facultySlug: string, groupSlug: string): strin
 }
 
 async function fetchTimetableHtml(url: string, weekStart: Date): Promise<string> {
-  const weekId = calculateWeekIdFromDate(weekStart)
+  const weekId = await calculateWeekIdFromDate(url, weekStart)
   const baseUrl = url.replace(/[?&]week_id=\d+/, "")
   const separator = baseUrl.includes("?") ? "&" : "?"
   const finalUrl = `${baseUrl}${separator}week_id=${weekId}`

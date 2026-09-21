@@ -151,12 +151,12 @@ function buildScheduleMessage(
   return lines.join("\n")
 }
 
-function buildNoLessonsMessage(
+function buildNextLessonsMessage(
   nextDate: Date | null,
   nextSchedule: DaySchedule | null,
   groupName: string | null
 ) {
-  const lines: string[] = ["😌 Сегодня пар нет."]
+  const lines: string[] = []
   if (!nextDate || !nextSchedule) {
     lines.push("Ближайшие занятия не найдены.")
     return lines.join("\n")
@@ -341,23 +341,26 @@ export async function GET(request: Request) {
       }
 
       if (settings.notifyNoLessons && todaySchedule.lessons.length === 0) {
-        const { date: nextDate, schedule: nextSchedule } = await findNextLessons(
-          settings.facultySlug,
-          settings.groupSlug,
-          now,
-          scheduleCache
-        )
-        const nextKey = nextDate ? formatDateKey(nextDate) : "none"
-        const noLessonsKey = nextKey
-        if (recipient.state.lastNoLessonsKey !== noLessonsKey) {
-          messages.push(
-            buildNoLessonsMessage(
-              nextDate,
-              nextSchedule,
-              settings.groupName ?? recipient.label
-            )
+        messages.push("😌 Сегодня пар нет.")
+
+        if (settings.sendNearestLessons) {
+          const { date: nextDate, schedule: nextSchedule } = await findNextLessons(
+            settings.facultySlug,
+            settings.groupSlug,
+            now,
+            scheduleCache
           )
-          stateUpdates.lastNoLessonsKey = noLessonsKey
+          const nextKey = nextDate ? formatDateKey(nextDate) : "none"
+          if (recipient.state.lastNoLessonsKey !== nextKey) {
+            messages.push(
+              buildNextLessonsMessage(
+                nextDate,
+                nextSchedule,
+                settings.groupName ?? recipient.label
+              )
+            )
+            stateUpdates.lastNoLessonsKey = nextKey
+          }
         }
       }
 

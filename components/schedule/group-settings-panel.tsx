@@ -40,6 +40,7 @@ export function GroupSettingsPanel({
     sendDayBefore: false,
     sendDayOf: true,
     notifyNoLessons: true,
+    sendNearestLessons: false,
     notifyHolidays: false,
     notifyVacations: false,
     notifyWeekStart: false,
