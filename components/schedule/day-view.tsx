@@ -10,6 +10,7 @@ interface DayViewProps {
   specialPeriod?: SpecialPeriod | null
   currentTime?: string
   isToday?: boolean
+  autoScrollLessonId?: string | null
 }
 
 function parseTimeToMinutes(value: string): number {
@@ -51,7 +52,13 @@ function findSlotIndex(lesson: DaySchedule["lessons"][number]): number {
   return -1
 }
 
-export function DayView({ schedule, specialPeriod, currentTime, isToday }: DayViewProps) {
+export function DayView({
+  schedule,
+  specialPeriod,
+  currentTime,
+  isToday,
+  autoScrollLessonId,
+}: DayViewProps) {
   const isNewYearHoliday = specialPeriod?.id === "ny2026"
   const nowMinutes =
     isToday && currentTime ? parseTimeToMinutes(currentTime) : Number.NaN
@@ -196,6 +203,7 @@ export function DayView({ schedule, specialPeriod, currentTime, isToday }: DayVi
                       isNext={isNextSlot && !isActiveSlot}
                       showTime={false}
                       density="compact"
+                      autoScrollTarget={lesson.id === autoScrollLessonId}
                     />
                   ))
                 ) : (
@@ -233,6 +241,7 @@ export function DayView({ schedule, specialPeriod, currentTime, isToday }: DayVi
               key={lesson.id}
               lesson={lesson}
               dayName={schedule.dayName}
+              autoScrollTarget={lesson.id === autoScrollLessonId}
             />
           ))}
         </div>

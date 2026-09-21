@@ -16,6 +16,7 @@ interface LessonCardProps {
   isNext?: boolean
   showTime?: boolean
   density?: "default" | "compact"
+  autoScrollTarget?: boolean
 }
 
 export function LessonCard({
@@ -25,6 +26,7 @@ export function LessonCard({
   isNext,
   showTime = true,
   density = "default",
+  autoScrollTarget = false,
 }: LessonCardProps) {
   const { hapticFeedback } = useTelegram()
   const [detailOpen, setDetailOpen] = useState(false)
@@ -45,6 +47,7 @@ export function LessonCard({
     <>
       <div
         onClick={handlePress}
+        data-auto-scroll-target={autoScrollTarget || undefined}
         className={cn(
           "relative rounded-xl transition-all duration-200 active:scale-[0.98] cursor-pointer",
           isCompact ? "p-3" : "p-4",
