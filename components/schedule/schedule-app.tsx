@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Calendar as CalendarIcon, Settings, Search, ChevronLeft, Sparkles, AlertCircle, RefreshCw } from "lucide-react"
 import { ru } from "react-day-picker/locale"
 import { cn } from "@/lib/utils"
@@ -86,6 +86,35 @@ const formatTime = (date: Date): string => {
   return `${hours}:${minutes}`
 }
 
+const parseTimeToMinutes = (value: string): number => {
+  const [hours, minutes] = value.split(":").map(Number)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return Number.NaN
+  return hours * 60 + minutes
+}
+
+const getAutoScrollLessonId = (
+  lessons: DaySchedule["lessons"],
+  isToday: boolean,
+  currentTime: string
+): string | null => {
+  const upcomingLessons = lessons
+    .filter((lesson) => !lesson.isCancelled)
+    .map((lesson) => ({
+      ...lesson,
+      startMinutes: parseTimeToMinutes(lesson.time),
+      endMinutes: parseTimeToMinutes(lesson.timeEnd),
+    }))
+    .filter((lesson) => !Number.isNaN(lesson.startMinutes) && !Number.isNaN(lesson.endMinutes))
+    .sort((first, second) => first.startMinutes - second.startMinutes)
+
+  if (!isToday) return upcomingLessons[0]?.id ?? null
+
+  const nowMinutes = parseTimeToMinutes(currentTime)
+  if (Number.isNaN(nowMinutes)) return null
+
+  return upcomingLessons.find((lesson) => nowMinutes <= lesson.endMinutes)?.id ?? null
+}
+
 const buildTimetableSpecialPeriod = (
   date: Date,
   specialDay: DaySchedule["specialDay"]
@@ -133,6 +162,8 @@ export function ScheduleApp() {
   const [retryCount, setRetryCount] = useState(0)
   const [apiWeekType, setApiWeekType] = useState<"even" | "odd" | null>(null)
   const [timetableSpecialPeriods, setTimetableSpecialPeriods] = useState<SpecialPeriod[]>([])
+  const [autoScrollRequested, setAutoScrollRequested] = useState(true)
+  const headerRef = useRef<HTMLElement>(null)
   
   const isPrivateChat = chat?.type === "private"
   const isGroupChat = chat?.type === "group" || chat?.type === "supergroup"
@@ -227,6 +258,10 @@ export function ScheduleApp() {
     }
   }, [schedule, selectedDay])
 
+  const autoScrollLessonId = useMemo(() => {
+    return getAutoScrollLessonId(selectedDaySchedule.lessons, isToday, currentTime)
+  }, [selectedDaySchedule.lessons, isToday, currentTime])
+
   const specialPeriod = useMemo(() => {
     if (selectedDaySchedule.specialDay) {
       return buildTimetableSpecialPeriod(selectedDate, selectedDaySchedule.specialDay)
@@ -244,6 +279,36 @@ export function ScheduleApp() {
   }, [schedule])
 
   const selectedGroupName = previewGroup?.groupName ?? settings.groupName
+
+  useEffect(() => {
+    if (viewMode === "day") {
+      setAutoScrollRequested(true)
+    }
+  }, [viewMode, selectedMonday, selectedDay, activeFaculty, activeGroup])
+
+  useEffect(() => {
+    if (!autoScrollRequested || viewMode !== "day" || isScheduleLoading) return
+
+    if (!autoScrollLessonId) return
+
+    const frame = requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(
+        '[data-auto-scroll-target="true"]'
+      )
+      const headerBottom = headerRef.current?.getBoundingClientRect().bottom ?? 0
+
+      if (target) {
+        const { top, bottom } = target.getBoundingClientRect()
+        if (top < headerBottom || bottom > window.innerHeight) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" })
+        }
+      }
+
+      setAutoScrollRequested(false)
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [autoScrollRequested, autoScrollLessonId, isScheduleLoading, viewMode])
 
   // Week navigation handlers
   const handlePrevWeek = () => {
@@ -311,7 +376,10 @@ export function ScheduleApp() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border"
+      >
         <div className="flex items-center justify-between px-4 py-3">
           {isPreviewMode ? (
             /* Preview mode header */
@@ -454,22 +522,25 @@ export function ScheduleApp() {
             </button>
           </div>
         )}
+
+        {viewMode === "day" && (
+          <div className="border-t border-border">
+            <DaySelector
+              selectedDay={selectedDay}
+              onSelect={handleViewDay}
+              currentDay={currentDayIndex}
+              hasLessons={hasLessons}
+              weekDates={weekDates}
+              isCurrentWeek={isCurrentWeek}
+            />
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
         {viewMode === "day" ? (
           <>
-            {/* Day Selector with Dates */}
-            <DaySelector
-              selectedDay={selectedDay}
-              onSelect={setSelectedDay}
-              currentDay={currentDayIndex}
-              hasLessons={hasLessons}
-              weekDates={weekDates}
-              isCurrentWeek={isCurrentWeek}
-            />
-
              {scheduleError ? (
                <div className="flex flex-col items-center justify-center py-12 px-4 text-center min-h-[320px]">
                  <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
@@ -528,6 +599,7 @@ export function ScheduleApp() {
                    specialPeriod={specialPeriod}
                    currentTime={currentTime}
                    isToday={isToday}
+                   autoScrollLessonId={autoScrollLessonId}
                  />
                </>
              )}
