@@ -17,6 +17,7 @@ const defaultSettings: UserSettings = {
   sendDayBefore: false,
   sendDayOf: true,
   notifyNoLessons: true,
+  sendNearestLessons: false,
   notifyHolidays: false,
   notifyVacations: false,
   notifyWeekStart: false,
