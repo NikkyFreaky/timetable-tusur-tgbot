@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   sendDayBefore: false,
   sendDayOf: true,
   notifyNoLessons: true,
+  sendNearestLessons: false,
   notifyHolidays: false,
   notifyVacations: false,
   notifyWeekStart: false,
@@ -117,6 +118,10 @@ function buildSettingsEntries(settings: UserSettings | null | undefined) {
       value: settings.notifyNoLessons ? "Да" : "Нет",
     },
     {
+      label: "Ближайшие занятия",
+      value: settings.sendNearestLessons ? "Да" : "Нет",
+    },
+    {
       label: "Праздники (за день)",
       value: settings.notifyHolidays ? "Да" : "Нет",
     },
@@ -154,6 +159,7 @@ function isDefaultSettings(settings: UserSettings | null | undefined) {
     settings.sendDayBefore === DEFAULT_SETTINGS.sendDayBefore &&
     settings.sendDayOf === DEFAULT_SETTINGS.sendDayOf &&
     settings.notifyNoLessons === DEFAULT_SETTINGS.notifyNoLessons &&
+    settings.sendNearestLessons === DEFAULT_SETTINGS.sendNearestLessons &&
     settings.notifyHolidays === DEFAULT_SETTINGS.notifyHolidays &&
     settings.notifyVacations === DEFAULT_SETTINGS.notifyVacations &&
     settings.notifyWeekStart === DEFAULT_SETTINGS.notifyWeekStart &&

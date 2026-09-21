@@ -111,6 +111,7 @@ export function SettingsPanel({
     sendDayBefore: false,
     sendDayOf: true,
     notifyNoLessons: true,
+    sendNearestLessons: false,
     notifyHolidays: false,
     notifyVacations: false,
     notifyWeekStart: false,
@@ -431,6 +432,7 @@ export function SettingsPanel({
       sendDayBefore: false,
       sendDayOf: true,
       notifyNoLessons: true,
+      sendNearestLessons: false,
       notifyHolidays: false,
       notifyVacations: false,
       notifyWeekStart: false,
@@ -687,6 +689,7 @@ export function SettingsPanel({
         sendDayBefore: false,
         sendDayOf: true,
         notifyNoLessons: true,
+        sendNearestLessons: false,
         notifyHolidays: false,
         notifyVacations: false,
         notifyWeekStart: false,
@@ -1036,6 +1039,18 @@ export function SettingsPanel({
                             </div>
                             <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 px-3 py-2.5 shadow-sm">
                               <span className="text-sm font-medium text-foreground">
+                                Показывать ближайшие занятия
+                              </span>
+                              <Switch
+                                checked={settings.sendNearestLessons}
+                                onCheckedChange={(enabled) => {
+                                  hapticFeedback("selection")
+                                  onUpdateSettings({ sendNearestLessons: enabled })
+                                }}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 px-3 py-2.5 shadow-sm">
+                              <span className="text-sm font-medium text-foreground">
                                 Праздники (за день)
                               </span>
                               <Switch
@@ -1351,6 +1366,19 @@ export function SettingsPanel({
                                             onCheckedChange={(enabled) => {
                                               hapticFeedback("selection")
                                               handleUpdateGroupSettings({ notifyNoLessons: enabled })
+                                            }}
+                                            disabled={userRole === "member"}
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/80 px-3 py-2.5 shadow-sm">
+                                          <span className="text-sm font-medium text-foreground">
+                                            Показывать ближайшие занятия
+                                          </span>
+                                          <Switch
+                                            checked={tempGroupSettings.sendNearestLessons}
+                                            onCheckedChange={(enabled) => {
+                                              hapticFeedback("selection")
+                                              handleUpdateGroupSettings({ sendNearestLessons: enabled })
                                             }}
                                             disabled={userRole === "member"}
                                           />

@@ -221,6 +221,7 @@ const SETTINGS_FIELD_LABELS: Record<string, string> = {
   sendDayBefore: "За день до",
   sendDayOf: "В день пар",
   notifyNoLessons: "Об отсутствии пар",
+  sendNearestLessons: "Ближайшие занятия",
   notifyHolidays: "Праздники (за день)",
   notifyVacations: "Каникулы (за день)",
   notifyWeekStart: "Начало недели",

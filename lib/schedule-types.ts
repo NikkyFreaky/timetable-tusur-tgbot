@@ -77,6 +77,7 @@ export interface UserSettings {
   sendDayBefore: boolean
   sendDayOf: boolean
   notifyNoLessons: boolean
+  sendNearestLessons: boolean
   notifyHolidays: boolean
   notifyVacations: boolean
   notifyWeekStart: boolean
