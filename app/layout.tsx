@@ -7,10 +7,7 @@ import Script from 'next/script'
 import './globals.css'
 import { UserSync } from '@/components/user-sync'
 
-import { Roboto, Roboto as V0_Font_Roboto } from 'next/font/google'
-
-// Initialize fonts
-const _roboto = V0_Font_Roboto({ subsets: ['latin'], weight: ["100","200","300","400","500","600","700","800","900"] })
+import { Roboto } from 'next/font/google'
 
 const roboto = Roboto({
   subsets: ["latin", "cyrillic"],
@@ -20,7 +17,6 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: 'Расписание ТУСУР',
   description: 'Расписание занятий для студентов ТУСУР',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
@@ -39,8 +35,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },

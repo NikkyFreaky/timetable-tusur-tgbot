@@ -8,6 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 type CacheEntry<T = unknown> = {
   value: T
   expiresAt: number
+  type: string
 }
 
 type InMemoryCache = Map<string, CacheEntry>
@@ -39,7 +40,7 @@ export async function get<T>(key: string): Promise<T | null> {
   try {
     const { data, error } = await supabase
       .from("cache")
-      .select("value, expires_at")
+      .select("value, expires_at, type")
       .eq("key", key)
       .gt("expires_at", new Date().toISOString())
       .single()
@@ -53,7 +54,7 @@ export async function get<T>(key: string): Promise<T | null> {
     }
 
     const expiresAt = new Date(data.expires_at).getTime()
-    inMemoryCache.set(key, { value: data.value, expiresAt })
+    inMemoryCache.set(key, { value: data.value, expiresAt, type: data.type })
     return data.value as T
   } catch {
     return null
@@ -72,7 +73,7 @@ export async function getWithStale<T>(key: string): Promise<{ value: T; isStale:
   try {
     const { data, error } = await supabase
       .from("cache")
-      .select("value, expires_at")
+      .select("value, expires_at, type")
       .eq("key", key)
       .single()
 
@@ -86,7 +87,7 @@ export async function getWithStale<T>(key: string): Promise<{ value: T; isStale:
 
     const expiresAt = new Date(data.expires_at).getTime()
     const isStale = expiresAt <= now
-    inMemoryCache.set(key, { value: data.value, expiresAt })
+    inMemoryCache.set(key, { value: data.value, expiresAt, type: data.type })
     return { value: data.value as T, isStale }
   } catch {
     return null
@@ -102,7 +103,7 @@ export async function set(
   const now = Date.now()
   const expiresAt = now + ttlMs
 
-  inMemoryCache.set(key, { value, expiresAt })
+  inMemoryCache.set(key, { value, expiresAt, type })
 
   try {
     const expiresAtIso = new Date(expiresAt).toISOString()
@@ -168,8 +169,10 @@ export async function cleanupExpired(): Promise<number> {
 }
 
 export async function deleteByType(type: string): Promise<number> {
-  for (const [key] of inMemoryCache.entries()) {
-    inMemoryCache.delete(key)
+  for (const [key, entry] of inMemoryCache.entries()) {
+    if (entry.type === type) {
+      inMemoryCache.delete(key)
+    }
   }
 
   let deletedCount = 0

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from "next/server"
 import { buildWebAppKeyboard, buildUrlKeyboard, sendTelegramMessage } from "@/lib/telegram-bot"
 import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getForumTopics } from "@/lib/telegram-api"
@@ -6,6 +7,15 @@ import { updateUserBotActive } from '@/lib/user-store'
 import { getBotMessageTemplate } from '@/lib/bot-message-templates'
 
 export const runtime = "nodejs"
+
+function hasValidWebhookSecret(request: Request, expectedSecret: string): boolean {
+  const receivedSecret = request.headers.get('x-telegram-bot-api-secret-token')
+  if (!receivedSecret) return false
+
+  const expected = Buffer.from(expectedSecret)
+  const received = Buffer.from(receivedSecret)
+  return expected.length === received.length && timingSafeEqual(expected, received)
+}
 
 type TelegramUpdate = {
   update_id: number
@@ -92,12 +102,20 @@ function getCommand(text: string | undefined) {
 
 export async function POST(request: Request) {
   const botToken = process.env.BOT_TOKEN
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
   const webAppUrl = process.env.WEBAPP_URL || process.env.NEXT_PUBLIC_WEBAPP_URL
   const miniAppUrl = process.env.MINI_APP_URL
 
   if (!botToken) {
     console.error("BOT_TOKEN is not set")
     return NextResponse.json({ ok: false, error: "BOT_TOKEN missing" }, { status: 500 })
+  }
+  if (!webhookSecret) {
+    console.error('TELEGRAM_WEBHOOK_SECRET is not set')
+    return NextResponse.json({ ok: false, error: 'Webhook is not configured' }, { status: 503 })
+  }
+  if (!hasValidWebhookSecret(request, webhookSecret)) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   if (!webAppUrl) {
     console.error("WEBAPP_URL or NEXT_PUBLIC_WEBAPP_URL is not set")
