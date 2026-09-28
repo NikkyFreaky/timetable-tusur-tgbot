@@ -72,10 +72,10 @@ export async function POST(request: Request) {
 
   const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const verifiedTargets = (await Promise.all(uniqueTargets.map(async (target) => {
-    const source = target.kind === 'user' ? 'users' : 'chats'
-    let query = supabase.from(source).select('id').eq('id', target.chatId).eq('bot_active', true)
-    if (source === 'chats') query = query.neq('type', 'private')
-    const { data } = await query.maybeSingle()
+    const { data } = target.kind === 'user'
+      ? await supabase.from('users').select('id').eq('id', target.chatId).eq('bot_active', true).maybeSingle()
+      : await supabase.from('chats').select('id').eq('id', target.chatId)
+        .eq('bot_active', true).neq('type', 'private').maybeSingle()
     if (!data) return null
     if (target.threadId) {
       const { data: topic } = await supabase.from('chat_topics')
