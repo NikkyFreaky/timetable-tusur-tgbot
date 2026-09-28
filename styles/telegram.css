@@ -1,0 +1,7 @@
+/* Telegram Mini App browser integration. */
+:root {
+  --tg-bg-color: var(--background);
+  --tg-text-color: var(--foreground);
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -336,11 +336,11 @@ async function upsertDevice(
 
   const { data: allDevices } = await supabase
     .from("user_devices")
-    .select("id")
+    .select("id, last_seen_at")
     .eq("user_id", userId)
+    .order("last_seen_at", { ascending: true })
 
   if (allDevices && allDevices.length > MAX_DEVICES) {
-    allDevices.sort((a: any, b: any) => a.last_seen_at.localeCompare(b.last_seen_at))
     const toDelete = allDevices.slice(0, allDevices.length - MAX_DEVICES)
     for (const dev of toDelete) {
       await supabase.from("user_devices").delete().eq("id", dev.id)
