@@ -1,0 +1,5 @@
+# Supabase CLI configuration for local development.
+#
+# This identifier namespaces local Docker resources only. Linking a hosted
+# project is deliberately kept in supabase/.temp/ (which is gitignored).
+project_id = "timetable-tusur-tgbot"

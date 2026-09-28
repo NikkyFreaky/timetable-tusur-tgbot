@@ -18,17 +18,8 @@ export const metadata: Metadata = {
   title: 'Расписание ТУСУР',
   description: 'Расписание занятий для студентов ТУСУР',
   icons: {
-    icon: [
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-      {
-        url: '/icon.png',
-        type: 'image/png',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/icon.png',
+    apple: '/icon.png',
   },
 }
 
