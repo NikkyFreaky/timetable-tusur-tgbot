@@ -22,6 +22,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase cli local project link
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
