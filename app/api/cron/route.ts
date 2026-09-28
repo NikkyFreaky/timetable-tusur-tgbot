@@ -9,6 +9,7 @@ import {
 import { fetchWeekSchedule } from "@/lib/timetable"
 import { sendTelegramMessage } from "@/lib/telegram-bot"
 import type { NotificationState } from "@/lib/notification-state"
+import { claimNotificationDispatch } from '@/lib/notification-dispatch-store'
 import { listUsersWithSettings, updateUsersNotificationState } from "@/lib/user-store"
 import { listChatsWithSettings, updateChatsNotificationState } from "@/lib/chat-store"
 
@@ -435,6 +436,17 @@ export async function GET(request: Request) {
       }
 
       if (messages.length === 0) {
+        skippedCount += 1
+        continue
+      }
+
+      const claimed = await claimNotificationDispatch({
+        recipientKind: recipient.kind,
+        recipientId: recipient.id,
+        notificationType: 'scheduled',
+        dispatchKey,
+      })
+      if (!claimed) {
         skippedCount += 1
         continue
       }
