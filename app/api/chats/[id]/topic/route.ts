@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getChatById, updateChatTopicId, getChatMemberRole } from "@/lib/chat-store"
 import { isAdmin } from "@/lib/telegram-api"
+import { requireTelegramInitData } from "@/lib/telegram-auth"
 
 export const runtime = "nodejs"
 
@@ -15,6 +16,9 @@ export async function POST(
   context: { params: Promise<Params> | Params }
 ) {
   try {
+    const auth = requireTelegramInitData(request)
+    if ('response' in auth) return auth.response
+
     const { id } = await context.params
     const chatId = Number(id)
 
@@ -30,19 +34,7 @@ export async function POST(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
-    const userIdHeader = request.headers.get("x-user-id")
-    if (!userIdHeader) {
-      console.log("User ID header missing")
-      return NextResponse.json({ error: "User ID required" }, { status: 401 })
-    }
-
-    const userId = Number(userIdHeader)
-    if (!Number.isFinite(userId)) {
-      console.log("Invalid user ID:", userIdHeader)
-      return NextResponse.json({ error: "Invalid user ID" }, { status: 401 })
-    }
-
-    const role = await getChatMemberRole(chatId, userId)
+    const role = await getChatMemberRole(chatId, auth.data.user.id)
     if (!role || !isAdmin(role)) {
       console.log("Access denied: role is not admin")
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })

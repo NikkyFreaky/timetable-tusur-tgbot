@@ -1,24 +1,32 @@
 import { NextResponse } from "next/server"
 import { listUserChats } from "@/lib/chat-store"
 import { getChat } from "@/lib/telegram-api"
+import { requireTelegramInitData } from "@/lib/telegram-auth"
 
 export const runtime = "nodejs"
 
 type Params = { id: string }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<Params> | Params }
 ) {
   try {
-    const { id } = await context.params
-    const userId = Number(id)
+    const auth = requireTelegramInitData(request)
+    if ('response' in auth) return auth.response
 
-    if (!Number.isFinite(userId)) {
+    const { id } = await context.params
+    const requestedUserId = Number(id)
+
+    if (!Number.isSafeInteger(requestedUserId)) {
       return NextResponse.json({ error: "Invalid user id" }, { status: 400 })
     }
 
-    const chats = await listUserChats(userId)
+    if (requestedUserId !== auth.data.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const chats = await listUserChats(auth.data.user.id)
     const botToken = process.env.BOT_TOKEN
 
     if (!botToken || chats.length === 0) {

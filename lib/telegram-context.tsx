@@ -45,6 +45,7 @@ interface TelegramWebApp {
   }
   platform?: string
   version?: string
+  initData: string
   colorScheme: "light" | "dark"
   themeParams: {
     bg_color?: string
@@ -181,3 +182,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 }
 
 export const useTelegram = () => useContext(TelegramContext)
+
+export function getTelegramInitDataHeaders(initData: string | undefined): HeadersInit {
+  return initData ? { 'x-telegram-init-data': initData } : {}
+}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { UserSettings } from "@/lib/schedule-types"
 import { useSettings } from "@/lib/settings-store"
-import { useTelegram } from "@/lib/telegram-context"
+import { getTelegramInitDataHeaders, useTelegram } from "@/lib/telegram-context"
 import type { TelegramClientInfo } from "@/lib/user-store"
 
 type UserResponse = {
@@ -89,7 +89,7 @@ export function UserSync() {
       return
     }
 
-    fetch(endpoint)
+    fetch(endpoint, { headers: getTelegramInitDataHeaders(webApp?.initData) })
       .then(async (response) => {
         if (!response.ok) return null
         const data = (await response.json()) as UserResponse | ChatResponse
@@ -155,7 +155,10 @@ export function UserSync() {
       if (scope === "chat" && chat?.id) {
         fetch("/api/chats/sync", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            'Content-Type': 'application/json',
+            ...getTelegramInitDataHeaders(webApp?.initData),
+          },
           body: JSON.stringify({ chat, settings }),
           signal: controller.signal,
         }).catch(() => {})
@@ -165,7 +168,10 @@ export function UserSync() {
         const device = buildDeviceInfo()
         fetch("/api/users/sync", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            'Content-Type': 'application/json',
+            ...getTelegramInitDataHeaders(webApp?.initData),
+          },
           body: JSON.stringify({ user, settings, device }),
           signal: controller.signal,
         }).catch(() => {})

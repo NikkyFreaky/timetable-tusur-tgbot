@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
-import { getChatById, upsertChat } from "@/lib/chat-store"
-import { getChat } from "@/lib/telegram-api"
+import { getChatById, getChatMemberRole, upsertChat } from "@/lib/chat-store"
+import { getChat, isAdmin } from "@/lib/telegram-api"
+import { requireTelegramInitData } from "@/lib/telegram-auth"
 
 export const runtime = "nodejs"
 
@@ -11,6 +12,9 @@ export async function POST(
   context: { params: Promise<Params> | Params }
 ) {
   try {
+    const auth = requireTelegramInitData(request)
+    if ('response' in auth) return auth.response
+
     const { id } = await context.params
     const chatId = Number(id)
 
@@ -18,6 +22,11 @@ export async function POST(
 
     if (!Number.isFinite(chatId)) {
       return NextResponse.json({ error: "Invalid chat id" }, { status: 400 })
+    }
+
+    const role = await getChatMemberRole(chatId, auth.data.user.id)
+    if (!role || !isAdmin(role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const botToken = process.env.BOT_TOKEN
