@@ -5,6 +5,7 @@ import { sendTelegramMessage } from '@/lib/telegram-bot'
 import { getDayIndex, getMondayOfWeek, formatDayDate } from '@/lib/schedule-data'
 import { DAY_NAMES, LESSON_TYPES } from '@/lib/schedule-types'
 import { fetchWeekSchedule } from '@/lib/timetable'
+import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
 
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
     && (target.threadId === undefined || target.threadId === null || Number.isSafeInteger(target.threadId)))
   if (!uniqueTargets.length) return NextResponse.json({ error: 'Недопустимые адресаты' }, { status: 400 })
 
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const verifiedTargets = (await Promise.all(uniqueTargets.map(async (target) => {
     const source = target.kind === 'user' ? 'users' : 'chats'
     let query = supabase.from(source).select('id').eq('id', target.chatId).eq('bot_active', true)

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient, getAdminUser } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
 
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabaseAdmin = createClient(
+    const supabaseAdmin = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceKey,
       { auth: { autoRefreshToken: false, persistSession: false } }

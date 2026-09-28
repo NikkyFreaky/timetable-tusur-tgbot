@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/database.types'
 
 export type BotCommand = 'start' | 'settings' | 'info'
 export type BotAudience = 'private' | 'group'
@@ -18,12 +19,15 @@ const DEFAULT_TEMPLATES: BotMessageTemplate[] = [
 ]
 
 function getSupabase() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
 export async function getBotMessageTemplates(): Promise<BotMessageTemplate[]> {
   const { data } = await getSupabase().from('bot_message_templates').select('command,audience,text')
-  const saved = new Map((data ?? []).map((item: BotMessageTemplate) => [`${item.command}:${item.audience}`, item]))
+  const saved = new Map((data ?? []).map((item) => [
+    `${item.command}:${item.audience}`,
+    item as BotMessageTemplate,
+  ]))
   return DEFAULT_TEMPLATES.map((item) => saved.get(`${item.command}:${item.audience}`) ?? item)
 }
 
