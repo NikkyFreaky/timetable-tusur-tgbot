@@ -115,7 +115,7 @@ export async function PATCH(
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const updates: Record<string, unknown> = {}
+    const updates: Database['public']['Tables']['admins']['Update'] = {}
     if (role && (role === 'admin' || role === 'superadmin')) {
       updates.role = role
     }
