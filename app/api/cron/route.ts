@@ -341,7 +341,15 @@ export async function GET(request: Request) {
         stateUpdates.lastDayOfDate = todayKey
       }
 
-      if (settings.notifyNoLessons && todaySchedule.lessons.length === 0) {
+      const isSunday = getDayIndex(now) === 6
+      const isSaturdayBeforeDayOff =
+        getDayIndex(now) === 5 && settings.sendDayBefore
+      if (
+        settings.notifyNoLessons &&
+        !isSunday &&
+        !isSaturdayBeforeDayOff &&
+        todaySchedule.lessons.length === 0
+      ) {
         messages.push("😌 Сегодня пар нет.")
 
         if (settings.sendNearestLessons) {
