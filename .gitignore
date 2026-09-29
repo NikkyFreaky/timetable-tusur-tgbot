@@ -18,9 +18,13 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
+
+# supabase cli local project link
+supabase/.temp/
 
 # typescript
 *.tsbuildinfo

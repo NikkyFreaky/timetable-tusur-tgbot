@@ -1,11 +1,12 @@
 import { createClient } from "@supabase/supabase-js"
 import type { UserSettings, ChatTopic } from "@/lib/schedule-types"
 import type { NotificationState } from "@/lib/notification-state"
+import type { Database, Json } from '@/lib/database.types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
 export type TelegramChatProfile = {
   id: number
@@ -95,7 +96,9 @@ export async function upsertChat(payload: {
     title: payload.chat.title ?? null,
     username: payload.chat.username ?? null,
     photo_url: payload.chat.photo_url ?? null,
-    settings: payload.settings === undefined ? ((existingChat?.settings as UserSettings) ?? null) : payload.settings,
+    settings: (payload.settings === undefined
+      ? existingChat?.settings ?? null
+      : payload.settings) as unknown as Json | null,
     topic_id: payload.topicId === undefined ? (existingChat?.topic_id ?? null) : payload.topicId,
     created_by: payload.createdBy === undefined ? (existingChat?.created_by ?? null) : payload.createdBy,
     is_forum: payload.isForum === undefined ? (existingChat?.is_forum ?? false) : payload.isForum,
@@ -354,6 +357,6 @@ export async function getChatMemberRole(
 
   if (!member) return null
 
-  return member.role
+  return member.role as "creator" | "administrator" | "member" | "left" | "kicked"
 }
 

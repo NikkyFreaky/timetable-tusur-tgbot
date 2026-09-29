@@ -5,6 +5,7 @@ import { ChevronDown, Settings, Users, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UserSettings, ChatTopic } from "@/lib/schedule-types"
 import type { StoredChat } from "@/lib/chat-store"
+import { getTelegramInitDataHeaders, useTelegram } from "@/lib/telegram-context"
 
 interface GroupSettingsPanelProps {
   userId: number
@@ -17,6 +18,7 @@ export function GroupSettingsPanel({
   isOpen,
   onOpenChange,
 }: GroupSettingsPanelProps) {
+  const { webApp } = useTelegram()
   const [chats, setChats] = useState<StoredChat[]>([])
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
   const [selectedChat, setSelectedChat] = useState<StoredChat | null>(null)
@@ -66,7 +68,9 @@ export function GroupSettingsPanel({
     setChatsError(null)
 
     try {
-      const response = await fetch(`/api/users/${userId}/chats`)
+      const response = await fetch(`/api/users/${userId}/chats`, {
+        headers: getTelegramInitDataHeaders(webApp?.initData),
+      })
       if (!response.ok) {
         throw new Error("⚠️ Не удалось загрузить чаты. Попробуйте ещё раз чуть позже.")
       }
@@ -105,7 +109,7 @@ export function GroupSettingsPanel({
     try {
       const response = await fetch(`/api/chats/${chatId}/topics`, {
         headers: {
-          "x-user-id": String(userId),
+          ...getTelegramInitDataHeaders(webApp?.initData),
         },
       })
 
@@ -146,7 +150,7 @@ export function GroupSettingsPanel({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": String(userId),
+          ...getTelegramInitDataHeaders(webApp?.initData),
         },
         body: JSON.stringify({ topicId }),
       })

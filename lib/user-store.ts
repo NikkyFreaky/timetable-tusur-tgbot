@@ -1,11 +1,12 @@
 import { createClient } from "@supabase/supabase-js"
 import type { UserSettings } from "@/lib/schedule-types"
 import type { NotificationState } from "@/lib/notification-state"
+import type { Database, Json } from '@/lib/database.types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
 export type TelegramUserProfile = {
   id: number
@@ -411,7 +412,7 @@ export async function upsertUser(payload: {
     added_to_attachment_menu: payload.user.added_to_attachment_menu ?? null,
     allows_write_to_pm: payload.user.allows_write_to_pm ?? null,
     is_bot: payload.user.is_bot ?? null,
-    settings: payload.settings ?? existingUser?.settings ?? null,
+    settings: (payload.settings ?? existingUser?.settings ?? null) as unknown as Json | null,
     updated_at: now,
     last_seen_at: now,
   }

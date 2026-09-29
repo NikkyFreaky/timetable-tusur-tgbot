@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
-import { getChatById } from "@/lib/chat-store"
+import { getChatById, getChatMemberRole } from "@/lib/chat-store"
 import type { UserSettings } from "@/lib/schedule-types"
+import { isAdmin } from "@/lib/telegram-api"
+import { requireTelegramInitData } from "@/lib/telegram-auth"
 
 export const runtime = "nodejs"
 
@@ -15,6 +17,9 @@ export async function POST(
   context: { params: Promise<Params> | Params }
 ) {
   try {
+    const auth = requireTelegramInitData(request)
+    if ('response' in auth) return auth.response
+
     const { id } = await context.params
     const chatId = Number(id)
 
@@ -27,14 +32,9 @@ export async function POST(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
-    const userIdHeader = request.headers.get("x-user-id")
-    if (!userIdHeader) {
-      return NextResponse.json({ error: "User ID required" }, { status: 401 })
-    }
-
-    const userId = Number(userIdHeader)
-    if (!Number.isFinite(userId)) {
-      return NextResponse.json({ error: "Invalid user ID" }, { status: 401 })
+    const role = await getChatMemberRole(chatId, auth.data.user.id)
+    if (!role || !isAdmin(role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const { settings } = (await request.json()) as UpdateSettingsPayload

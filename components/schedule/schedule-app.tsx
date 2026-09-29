@@ -162,7 +162,7 @@ export function ScheduleApp() {
   const [retryCount, setRetryCount] = useState(0)
   const [apiWeekType, setApiWeekType] = useState<"even" | "odd" | null>(null)
   const [timetableSpecialPeriods, setTimetableSpecialPeriods] = useState<SpecialPeriod[]>([])
-  const [autoScrollRequested, setAutoScrollRequested] = useState(true)
+  const [autoScrollRequestId, setAutoScrollRequestId] = useState(0)
   const headerRef = useRef<HTMLElement>(null)
   
   const isPrivateChat = chat?.type === "private"
@@ -235,6 +235,7 @@ export function ScheduleApp() {
         setApiWeekType(data.weekType || null)
         setSchedule(normalizeSchedule(data.days || []))
         setTimetableSpecialPeriods(data.specialPeriods || [])
+        setAutoScrollRequestId((requestId) => requestId + 1)
       })
       .catch((error) => {
         if ((error as { name?: string }).name === "AbortError") return
@@ -282,12 +283,12 @@ export function ScheduleApp() {
 
   useEffect(() => {
     if (viewMode === "day") {
-      setAutoScrollRequested(true)
+      setAutoScrollRequestId((requestId) => requestId + 1)
     }
-  }, [viewMode, selectedMonday, selectedDay, activeFaculty, activeGroup])
+  }, [viewMode])
 
   useEffect(() => {
-    if (!autoScrollRequested || viewMode !== "day" || isScheduleLoading) return
+    if (viewMode !== "day" || isScheduleLoading) return
 
     if (!autoScrollLessonId) return
 
@@ -304,11 +305,10 @@ export function ScheduleApp() {
         }
       }
 
-      setAutoScrollRequested(false)
     })
 
     return () => cancelAnimationFrame(frame)
-  }, [autoScrollRequested, autoScrollLessonId, isScheduleLoading, viewMode])
+  }, [autoScrollRequestId, autoScrollLessonId, isScheduleLoading, viewMode])
 
   // Week navigation handlers
   const handlePrevWeek = () => {

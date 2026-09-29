@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminUser } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
 
@@ -13,7 +14,7 @@ export async function GET() {
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
+    const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()

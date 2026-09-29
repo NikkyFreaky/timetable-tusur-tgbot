@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server"
 import { upsertUser, type TelegramClientInfo, type TelegramUserProfile } from "@/lib/user-store"
 import type { UserSettings } from "@/lib/schedule-types"
+import { requireTelegramInitData } from "@/lib/telegram-auth"
 
 export const runtime = "nodejs"
 
 type SyncPayload = {
-  user?: TelegramUserProfile
   settings?: UserSettings | null
   device?: TelegramClientInfo | null
 }
 
 export async function POST(request: Request) {
   try {
+    const auth = requireTelegramInitData(request)
+    if ('response' in auth) return auth.response
+
     const payload = (await request.json()) as SyncPayload
     const forwardedFor = request.headers.get("x-forwarded-for")
     const ip =
@@ -20,13 +23,8 @@ export async function POST(request: Request) {
       request.headers.get("cf-connecting-ip") ||
       null
 
-    const userId = Number(payload.user?.id)
-    if (!Number.isFinite(userId) || !payload.user?.first_name) {
-      return NextResponse.json({ error: "Missing user" }, { status: 400 })
-    }
-
     const stored = await upsertUser({
-      user: { ...payload.user, id: userId },
+      user: auth.data.user as TelegramUserProfile,
       settings: payload.settings ?? null,
       device: payload.device ?? null,
       ip,

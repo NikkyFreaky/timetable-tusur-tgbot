@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAdminUser } from '@/lib/supabase-server'
+import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
 
@@ -10,7 +11,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
   const [usersResult, chatsResult, topicsResult] = await Promise.all([
     supabase.from('users').select('id,first_name,last_name,username').eq('bot_active', true).order('last_seen_at', { ascending: false }),
     supabase.from('chats').select('id,type,title,username,is_forum,topic_id').eq('bot_active', true).neq('type', 'private').order('last_seen_at', { ascending: false }),
