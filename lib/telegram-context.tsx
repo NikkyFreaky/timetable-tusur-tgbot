@@ -73,6 +73,7 @@ interface TelegramWebApp {
     chat_type?: string
   }
   sendData: (data: string) => void
+  openLink: (url: string, options?: { try_instant_view?: boolean }) => void
   setHeaderColor: (color: string) => void
   setBackgroundColor: (color: string) => void
   enableClosingConfirmation: () => void

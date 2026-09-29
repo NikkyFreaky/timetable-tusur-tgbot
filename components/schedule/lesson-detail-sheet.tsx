@@ -19,7 +19,7 @@ interface LessonDetailSheetProps {
 }
 
 export function LessonDetailSheet({ lesson, dayName, open, onOpenChange }: LessonDetailSheetProps) {
-  const { hapticFeedback } = useTelegram()
+  const { hapticFeedback, webApp } = useTelegram()
 
   if (!lesson) return null
 
@@ -48,9 +48,12 @@ export function LessonDetailSheet({ lesson, dayName, open, onOpenChange }: Lesso
       : buildingStyle.address
     : undefined
 
-  const handleLinkClick = (url: string) => {
+  const handleLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, url: string) => {
     hapticFeedback("light")
-    window.open(url, "_blank", "noopener,noreferrer")
+    if (webApp?.openLink) {
+      event.preventDefault()
+      webApp.openLink(url)
+    }
   }
 
   return (
@@ -230,7 +233,7 @@ interface DetailRowProps {
   value: React.ReactNode
   secondaryValue?: string
   linkUrl?: string
-  onLinkClick?: (url: string) => void
+  onLinkClick?: (event: React.MouseEvent<HTMLAnchorElement>, url: string) => void
   valueClassName?: string
 }
 
@@ -250,16 +253,18 @@ function DetailRow({
       <div className="flex-1 min-w-0">
         <span className="text-sm text-muted-foreground block">{label}</span>
         {canLink ? (
-          <button
-            type="button"
-            onClick={() => onLinkClick?.(linkUrl as string)}
+          <a
+            href={linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(event) => onLinkClick?.(event, linkUrl as string)}
             className={cn(
-              "text-base text-primary font-medium hover:underline underline-offset-4 text-left",
+              "cursor-pointer text-base text-primary font-medium hover:underline underline-offset-4 text-left",
               valueClassName
             )}
           >
             {value}
-          </button>
+          </a>
         ) : (
           <span className={cn("text-base text-foreground font-medium block", valueClassName)}>
             {value}
@@ -277,7 +282,7 @@ interface LinkListRowProps {
   icon: React.ReactNode
   label: string
   links: ResourceLink[]
-  onLinkClick: (url: string) => void
+  onLinkClick: (event: React.MouseEvent<HTMLAnchorElement>, url: string) => void
 }
 
 function LinkListRow({ icon, label, links, onLinkClick }: LinkListRowProps) {
@@ -288,17 +293,20 @@ function LinkListRow({ icon, label, links, onLinkClick }: LinkListRowProps) {
         <span className="text-sm text-muted-foreground block mb-2">{label}</span>
         <div className="flex flex-wrap gap-2">
           {links.map((link, index) => (
-            <button
+            <a
               key={`${link.url}-${index}`}
-              onClick={() => onLinkClick(link.url)}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => onLinkClick(event, link.url)}
               className={cn(
-                "px-3 py-2 rounded-xl text-sm font-medium",
+                "cursor-pointer px-3 py-2 rounded-xl text-sm font-medium",
                 "bg-primary/10 text-primary",
                 "active:scale-[0.98] transition-transform"
               )}
             >
               {link.label}
-            </button>
+            </a>
           ))}
         </div>
       </div>
@@ -326,7 +334,7 @@ function NotePopover({ notes }: { notes: string[] }) {
               setOpen(false)
             }
           }}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:text-foreground"
+          className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border border-border text-muted-foreground transition hover:text-foreground"
         >
           <Info className="h-3.5 w-3.5" />
         </button>
