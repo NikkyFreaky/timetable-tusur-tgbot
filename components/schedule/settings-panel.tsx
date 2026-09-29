@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import type { UserSettings } from "@/lib/schedule-types"
 import type { StoredChat } from "@/lib/chat-store"
 import type { ChatTopic } from "@/lib/schedule-types"
-import { useTelegram } from "@/lib/telegram-context"
+import { getTelegramInitDataHeaders, useTelegram } from "@/lib/telegram-context"
 import type { CourseOption, FacultyOption, GroupOption } from "@/lib/timetable-types"
 import { type GroupSearchMatch, normalizeSearchValue, buildGroupSearchMatches } from "@/lib/group-search"
 
@@ -66,7 +66,7 @@ export function SettingsPanel({
   scopeLabel,
   userId,
 }: SettingsPanelProps) {
-  const { hapticFeedback } = useTelegram()
+  const { hapticFeedback, webApp } = useTelegram()
   const [view, setView] = useState<SettingsView>("main")
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal")
   const [tempFacultySlug, setTempFacultySlug] = useState<string | null>(settings.facultySlug)
@@ -370,7 +370,9 @@ export function SettingsPanel({
 
     console.log("=== Loading user chats ===", { userId })
 
-    fetch(`/api/users/${userId}/chats`)
+    fetch(`/api/users/${userId}/chats`, {
+      headers: getTelegramInitDataHeaders(webApp?.initData),
+    })
       .then(async (response) => {
         console.log("Chats response status:", response.status)
         if (!response.ok) {
@@ -456,7 +458,7 @@ export function SettingsPanel({
 
     fetch(`/api/chats/${chatId}/topics`, {
       headers: {
-        "x-user-id": String(userId),
+        ...getTelegramInitDataHeaders(webApp?.initData),
       },
     })
       .then(async (response) => {
@@ -498,6 +500,7 @@ export function SettingsPanel({
     try {
       const response = await fetch(`/api/chats/${chatId}/sync-info`, {
         method: "POST",
+        headers: getTelegramInitDataHeaders(webApp?.initData),
       })
 
       console.log("Sync chat info response status:", response.status)
@@ -537,7 +540,7 @@ export function SettingsPanel({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": String(userId),
+          ...getTelegramInitDataHeaders(webApp?.initData),
         },
         body: JSON.stringify({ topicId }),
       })
@@ -577,7 +580,7 @@ export function SettingsPanel({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": String(userId),
+          ...getTelegramInitDataHeaders(webApp?.initData),
         },
         body: JSON.stringify({ settings: updates }),
       })

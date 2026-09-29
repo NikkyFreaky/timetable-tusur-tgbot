@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminUser, createSupabaseServerClient } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
 
@@ -52,7 +53,7 @@ export async function PATCH(request: Request) {
 
     // Обновление display_name в таблице admins
     if (displayName !== undefined) {
-      const supabaseAdmin = createClient(
+      const supabaseAdmin = createClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         serviceKey,
         { auth: { autoRefreshToken: false, persistSession: false } }
@@ -108,7 +109,7 @@ export async function PATCH(request: Request) {
       }
 
       // Обновляем через service role (надежнее)
-      const supabaseAdmin = createClient(
+      const supabaseAdmin = createClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         serviceKey,
         { auth: { autoRefreshToken: false, persistSession: false } }

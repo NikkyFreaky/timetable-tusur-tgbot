@@ -45,6 +45,7 @@ interface TelegramWebApp {
   }
   platform?: string
   version?: string
+  initData: string
   colorScheme: "light" | "dark"
   themeParams: {
     bg_color?: string
@@ -72,6 +73,7 @@ interface TelegramWebApp {
     chat_type?: string
   }
   sendData: (data: string) => void
+  openLink: (url: string, options?: { try_instant_view?: boolean }) => void
   setHeaderColor: (color: string) => void
   setBackgroundColor: (color: string) => void
   enableClosingConfirmation: () => void
@@ -181,3 +183,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 }
 
 export const useTelegram = () => useContext(TelegramContext)
+
+export function getTelegramInitDataHeaders(initData: string | undefined): HeadersInit {
+  return initData ? { 'x-telegram-init-data': initData } : {}
+}

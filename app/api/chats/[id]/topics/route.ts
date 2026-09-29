@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getChatById, listChatTopics, getChatMemberRole, upsertChat } from "@/lib/chat-store"
 import { isAdmin, getChat } from "@/lib/telegram-api"
+import { requireTelegramInitData } from "@/lib/telegram-auth"
 
 export const runtime = "nodejs"
 
@@ -11,6 +12,9 @@ export async function GET(
   context: { params: Promise<Params> | Params }
 ) {
   try {
+    const auth = requireTelegramInitData(request)
+    if ('response' in auth) return auth.response
+
     const { id } = await context.params
     const chatId = Number(id)
 
@@ -67,21 +71,9 @@ export async function GET(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
-    const userIdHeader = request.headers.get("x-user-id")
-    if (!userIdHeader) {
-      console.log("User ID header missing")
-      return NextResponse.json({ error: "User ID required" }, { status: 401 })
-    }
+    console.log("Checking user role:", { chatId, userId: auth.data.user.id })
 
-    const userId = Number(userIdHeader)
-    if (!Number.isFinite(userId)) {
-      console.log("Invalid user ID:", userIdHeader)
-      return NextResponse.json({ error: "Invalid user ID" }, { status: 401 })
-    }
-
-    console.log("Checking user role:", { chatId, userId })
-
-    const role = await getChatMemberRole(chatId, userId)
+    const role = await getChatMemberRole(chatId, auth.data.user.id)
     console.log("User role:", role)
 
     if (!role || !isAdmin(role)) {

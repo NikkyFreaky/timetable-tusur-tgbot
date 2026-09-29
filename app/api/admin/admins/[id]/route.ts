@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAdminUser } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
 
@@ -39,7 +40,7 @@ export async function DELETE(
       )
     }
 
-    const supabaseAdmin = createClient(
+    const supabaseAdmin = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceKey,
       { auth: { autoRefreshToken: false, persistSession: false } }
@@ -108,13 +109,13 @@ export async function PATCH(
       )
     }
 
-    const supabaseAdmin = createClient(
+    const supabaseAdmin = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       serviceKey,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    const updates: Record<string, unknown> = {}
+    const updates: Database['public']['Tables']['admins']['Update'] = {}
     if (role && (role === 'admin' || role === 'superadmin')) {
       updates.role = role
     }
