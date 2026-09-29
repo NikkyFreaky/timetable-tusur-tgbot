@@ -34,14 +34,25 @@ function getRetryAfter(error: unknown) {
   return match ? Number(match[1]) : null
 }
 
-async function sendWithRetry(botToken: string, target: Target, text: string) {
+async function sendWithRetry(
+  botToken: string,
+  target: Target,
+  text: string,
+  parseMode?: 'HTML' | 'MarkdownV2'
+) {
   try {
-    await sendTelegramMessage(botToken, target.chatId, text, { messageThreadId: target.threadId ?? undefined })
+    await sendTelegramMessage(botToken, target.chatId, text, {
+      messageThreadId: target.threadId ?? undefined,
+      parseMode,
+    })
   } catch (error) {
     const retryAfter = getRetryAfter(error)
     if (!retryAfter) throw error
     await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000))
-    await sendTelegramMessage(botToken, target.chatId, text, { messageThreadId: target.threadId ?? undefined })
+    await sendTelegramMessage(botToken, target.chatId, text, {
+      messageThreadId: target.threadId ?? undefined,
+      parseMode,
+    })
   }
 }
 
@@ -116,7 +127,7 @@ export async function POST(request: Request) {
   let failed = 0
   for (const target of verifiedTargets) {
     try {
-      await sendWithRetry(botToken, target, text)
+      await sendWithRetry(botToken, target, text, body.kind === 'text' ? 'HTML' : undefined)
       sent += 1
       await supabase.from('bot_message_delivery_attempts').insert({ dispatch_id: dispatch.id, chat_id: target.chatId, message_thread_id: target.threadId ?? null, status: 'sent' })
     } catch (error) {
