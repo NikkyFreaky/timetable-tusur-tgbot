@@ -50,7 +50,7 @@ export function LessonDetailSheet({ lesson, dayName, open, onOpenChange }: Lesso
 
   const handleLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, url: string) => {
     hapticFeedback("light")
-    if (webApp?.openLink) {
+    if (webApp?.initData && webApp.openLink) {
       event.preventDefault()
       webApp.openLink(url)
     }
