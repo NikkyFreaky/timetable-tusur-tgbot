@@ -36,6 +36,7 @@ interface EmployeeAvailabilitySettingsProps {
   chatId?: number
   isForum?: boolean
   topics?: ChatTopic[]
+  heading?: string
 }
 
 const EMPTY_CONFIG: Omit<EmployeeAvailabilityConfig, 'id' | 'people'> = {
@@ -71,6 +72,7 @@ export function EmployeeAvailabilitySettings({
   chatId,
   isForum = false,
   topics = [],
+  heading = 'Сводка сотрудников',
 }: EmployeeAvailabilitySettingsProps) {
   const { hapticFeedback, webApp } = useTelegram()
   const [allowed, setAllowed] = useState<boolean | null>(null)
@@ -320,7 +322,7 @@ export function EmployeeAvailabilitySettings({
   return (
     <section className="px-4 mb-6">
       <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Сводка сотрудников
+        {heading}
       </h3>
       <div className="rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between p-4">
