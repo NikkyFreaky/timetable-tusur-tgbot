@@ -511,6 +511,16 @@ export function buildTimetableUrl(facultySlug: string, groupSlug: string): strin
   return `${BASE_URL}/faculties/${facultySlug}/groups/${groupSlug}`
 }
 
+export async function buildTimetableUrlForWeek(
+  facultySlug: string,
+  groupSlug: string,
+  weekStart: Date
+): Promise<string> {
+  const url = buildTimetableUrl(facultySlug, groupSlug)
+  const weekId = await calculateWeekIdFromDate(url, weekStart)
+  return `${url}?week_id=${weekId}`
+}
+
 async function fetchTimetableHtml(url: string, weekStart: Date): Promise<string> {
   const weekId = await calculateWeekIdFromDate(url, weekStart)
   const baseUrl = url.replace(/[?&]week_id=\d+/, "")
