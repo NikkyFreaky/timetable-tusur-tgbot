@@ -206,6 +206,33 @@ export async function addEmployeeAvailabilityPerson(input: {
   if (error) throw new Error(`Failed to add employee availability person: ${error.message}`)
 }
 
+export async function updateEmployeeAvailabilityPerson(input: {
+  configId: string
+  personId: string
+  fullName: string
+  facultySlug: string
+  facultyName: string
+  groupSlug: string
+  groupName: string
+  course: number
+}) {
+  const supabase = getServiceClient()
+  const { error } = await supabase
+    .from('employee_availability_people')
+    .update({
+      full_name: input.fullName,
+      faculty_slug: input.facultySlug,
+      faculty_name: input.facultyName,
+      group_slug: input.groupSlug,
+      group_name: input.groupName,
+      course: input.course,
+    })
+    .eq('id', input.personId)
+    .eq('config_id', input.configId)
+
+  if (error) throw new Error(`Failed to update employee availability person: ${error.message}`)
+}
+
 export async function reorderEmployeeAvailabilityPeople(configId: string, personIds: string[]) {
   const supabase = getServiceClient()
   const results = await Promise.all(personIds.map((personId, sortOrder) => supabase

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
-import { ChevronRight, Clock, GripVertical, Plus, Trash2, Users } from 'lucide-react'
+import { ChevronRight, Clock, GripVertical, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { GroupSearchDrawer } from '@/components/schedule/group-search-drawer'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -13,7 +13,9 @@ import type { ChatTopic } from '@/lib/schedule-types'
 interface EmployeeAvailabilityPerson {
   id: string
   fullName: string
+  facultySlug: string
   facultyName: string
+  groupSlug: string
   groupName: string
   course: number
   sortOrder: number
@@ -80,6 +82,12 @@ export function EmployeeAvailabilitySettings({
   const [fullName, setFullName] = useState('')
   const [group, setGroup] = useState<GroupSearchMatch | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [editingPerson, setEditingPerson] = useState<EmployeeAvailabilityPerson | null>(null)
+  const [editingFullName, setEditingFullName] = useState('')
+  const [editingGroup, setEditingGroup] = useState<GroupSearchMatch | null>(null)
+  const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [editGroupSearchOpen, setEditGroupSearchOpen] = useState(false)
+  const [editMessage, setEditMessage] = useState('')
   const [timePickerOpen, setTimePickerOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -207,6 +215,58 @@ export function EmployeeAvailabilitySettings({
       setConfig(data.config)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось удалить сотрудника')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openEditPerson = (person: EmployeeAvailabilityPerson) => {
+    setEditingPerson(person)
+    setEditingFullName(person.fullName)
+    setEditingGroup({
+      facultySlug: person.facultySlug,
+      facultyName: person.facultyName,
+      courseNumber: person.course,
+      groupSlug: person.groupSlug,
+      groupName: person.groupName,
+    })
+    setEditMessage('')
+    setEditSheetOpen(true)
+  }
+
+  const savePerson = async () => {
+    if (!editingPerson || !editingFullName.trim() || !editingGroup) {
+      setEditMessage('Укажите ФИО и выберите группу')
+      return
+    }
+
+    setSaving(true)
+    setEditMessage('')
+    try {
+      const response = await fetch(`/api/employee-availability${query}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          personId: editingPerson.id,
+          fullName: editingFullName.trim(),
+          facultySlug: editingGroup.facultySlug,
+          facultyName: editingGroup.facultyName,
+          groupSlug: editingGroup.groupSlug,
+          groupName: editingGroup.groupName,
+          course: editingGroup.courseNumber,
+        }),
+      })
+      const data = await response.json().catch(() => ({})) as {
+        config?: EmployeeAvailabilityConfig
+        error?: string
+      }
+      if (!response.ok || !data.config) throw new Error(data.error ?? 'Не удалось сохранить сотрудника')
+      setConfig(data.config)
+      setEditSheetOpen(false)
+      setEditingPerson(null)
+      hapticFeedback('success')
+    } catch (error) {
+      setEditMessage(error instanceof Error ? error.message : 'Не удалось сохранить сотрудника')
     } finally {
       setSaving(false)
     }
@@ -496,6 +556,15 @@ export function EmployeeAvailabilitySettings({
                   <button
                     type="button"
                     disabled={saving}
+                    onClick={() => openEditPerson(person)}
+                    className="rounded-md p-2 text-muted-foreground hover:text-foreground"
+                    aria-label={`Редактировать ${person.fullName}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving}
                     onClick={() => void removePerson(person.id)}
                     className="rounded-md p-2 text-muted-foreground hover:text-destructive"
                     aria-label={`Удалить ${person.fullName}`}
@@ -511,6 +580,67 @@ export function EmployeeAvailabilitySettings({
         )}
       </div>
       <GroupSearchDrawer open={searchOpen} onOpenChange={setSearchOpen} onSelectGroup={setGroup} />
+      <GroupSearchDrawer
+        open={editGroupSearchOpen}
+        onOpenChange={setEditGroupSearchOpen}
+        onSelectGroup={setEditingGroup}
+      />
+      <Sheet
+        open={editSheetOpen}
+        onOpenChange={(open) => {
+          setEditSheetOpen(open)
+          if (!open) setEditMessage('')
+        }}
+      >
+        <SheetContent side="bottom" className="rounded-t-3xl px-0">
+          <SheetHeader className="border-b border-border px-4 pb-4">
+            <SheetTitle className="mx-auto text-lg">Изменить сотрудника</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 px-4 py-4">
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">ФИО сотрудника</span>
+              <Input
+                value={editingFullName}
+                maxLength={200}
+                disabled={saving}
+                onChange={(event) => setEditingFullName(event.target.value)}
+              />
+            </label>
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Группа</span>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setEditGroupSearchOpen(true)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-left text-sm disabled:opacity-50"
+              >
+                {editingGroup
+                  ? `Группа ${editingGroup.groupName} · ${editingGroup.facultyName}`
+                  : 'Выбрать группу'}
+              </button>
+            </div>
+            {editMessage && <div className="text-sm text-destructive">{editMessage}</div>}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setEditSheetOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void savePerson()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
       <Sheet open={timePickerOpen} onOpenChange={setTimePickerOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl px-0">
           <SheetHeader className="border-b border-border px-4 pb-4">

@@ -6,6 +6,7 @@ import {
   hasEmployeeAvailabilityAccess,
   reorderEmployeeAvailabilityPeople,
   saveEmployeeAvailabilityConfig,
+  updateEmployeeAvailabilityPerson,
 } from '@/lib/employee-availability-store'
 import { getChatById, getChatMemberRole, listChatTopics } from '@/lib/chat-store'
 import { isAdmin } from '@/lib/telegram-api'
@@ -173,7 +174,36 @@ export async function PATCH(request: Request) {
     const config = await getEmployeeAvailabilityConfig(target.kind, target.id)
     if (!config) return NextResponse.json({ error: 'Список сотрудников не найден' }, { status: 404 })
 
-    const body = await request.json().catch(() => null) as { personIds?: unknown } | null
+    const body = await request.json().catch(() => null) as Record<string, unknown> | null
+    const personId = typeof body?.personId === 'string' ? body.personId : null
+    if (personId) {
+      if (!config.people.some((person) => person.id === personId)) {
+        return NextResponse.json({ error: 'Сотрудник не найден' }, { status: 404 })
+      }
+
+      const fullName = typeof body?.fullName === 'string' ? body.fullName.trim() : ''
+      const facultySlug = typeof body?.facultySlug === 'string' ? body.facultySlug : ''
+      const facultyName = typeof body?.facultyName === 'string' ? body.facultyName : ''
+      const groupSlug = typeof body?.groupSlug === 'string' ? body.groupSlug : ''
+      const groupName = typeof body?.groupName === 'string' ? body.groupName : ''
+      const course = Number(body?.course)
+      if (!fullName || fullName.length > 200 || !facultySlug || !facultyName || !groupSlug || !groupName || !Number.isInteger(course) || course <= 0) {
+        return NextResponse.json({ error: 'Укажите ФИО и группу сотрудника' }, { status: 400 })
+      }
+
+      await updateEmployeeAvailabilityPerson({
+        configId: config.id,
+        personId,
+        fullName,
+        facultySlug,
+        facultyName,
+        groupSlug,
+        groupName,
+        course,
+      })
+      return NextResponse.json({ config: await getEmployeeAvailabilityConfig(target.kind, target.id) })
+    }
+
     const personIds = Array.isArray(body?.personIds) ? body.personIds : []
     if (
       personIds.length !== config.people.length
