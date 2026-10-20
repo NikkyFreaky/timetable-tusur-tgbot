@@ -80,11 +80,12 @@ export function getAvailableWorkIntervals(lessons: Lesson[]): TimeInterval[] {
 }
 
 export function shouldIncludeEmployeeAvailabilityReport(lessons: Lesson[]): boolean {
-  const activeLessons = lessons.filter((lesson) => !lesson.isCancelled)
-  if (activeLessons.length === 0) return true
-  return !activeLessons.every((lesson) => {
+  return lessons.some((lesson) => {
+    if (lesson.isCancelled) return false
     const start = parseTime(lesson.time)
-    return start !== null && start >= WORKDAY_END
+    const end = parseTime(lesson.timeEnd)
+    return start !== null && end !== null && end > start
+      && start < WORKDAY_END && end > WORKDAY_START
   })
 }
 

@@ -115,9 +115,15 @@ describe('shouldIncludeEmployeeAvailabilityReport', () => {
     ])).toBe(true)
   })
 
-  it('включает сотрудника без активных пар', () => {
+  it('исключает сотрудника без активных пар', () => {
     expect(shouldIncludeEmployeeAvailabilityReport([
       lesson('18:00', '19:30', true),
+    ])).toBe(false)
+  })
+
+  it('включает пару, пересекающую начало рабочего дня', () => {
+    expect(shouldIncludeEmployeeAvailabilityReport([
+      lesson('08:30', '09:15'),
     ])).toBe(true)
   })
 })
