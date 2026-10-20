@@ -351,36 +351,48 @@ export type Database = {
           created_by: number | null
           enabled: boolean
           id: string
+          lunch_end: string
+          lunch_start: string
           notification_time: string
           recipient_id: number
           recipient_kind: string
           topic_id: number | null
           updated_at: string
           updated_by: number | null
+          workday_end: string
+          workday_start: string
         }
         Insert: {
           created_at?: string
           created_by?: number | null
           enabled?: boolean
           id?: string
+          lunch_end?: string
+          lunch_start?: string
           notification_time?: string
           recipient_id: number
           recipient_kind: string
           topic_id?: number | null
           updated_at?: string
           updated_by?: number | null
+          workday_end?: string
+          workday_start?: string
         }
         Update: {
           created_at?: string
           created_by?: number | null
           enabled?: boolean
           id?: string
+          lunch_end?: string
+          lunch_start?: string
           notification_time?: string
           recipient_id?: number
           recipient_kind?: string
           topic_id?: number | null
           updated_at?: string
           updated_by?: number | null
+          workday_end?: string
+          workday_start?: string
         }
         Relationships: []
       }

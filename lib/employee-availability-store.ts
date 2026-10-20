@@ -21,6 +21,10 @@ export interface EmployeeAvailabilityConfig {
   topicId: number | null
   enabled: boolean
   notificationTime: string
+  workdayStart: string
+  workdayEnd: string
+  lunchStart: string
+  lunchEnd: string
   people: EmployeeAvailabilityPerson[]
 }
 
@@ -31,6 +35,10 @@ type ConfigRow = {
   topic_id: number | null
   enabled: boolean
   notification_time: string
+  workday_start: string
+  workday_end: string
+  lunch_start: string
+  lunch_end: string
   employee_availability_people?: Array<{
     id: string
     full_name: string
@@ -58,6 +66,10 @@ function mapConfig(row: ConfigRow): EmployeeAvailabilityConfig {
     topicId: row.topic_id,
     enabled: row.enabled,
     notificationTime: row.notification_time,
+    workdayStart: row.workday_start,
+    workdayEnd: row.workday_end,
+    lunchStart: row.lunch_start,
+    lunchEnd: row.lunch_end,
     people: (row.employee_availability_people ?? []).map((person) => ({
       id: person.id,
       fullName: person.full_name,
@@ -137,6 +149,10 @@ export async function saveEmployeeAvailabilityConfig(input: {
   topicId: number | null
   enabled: boolean
   notificationTime: string
+  workdayStart: string
+  workdayEnd: string
+  lunchStart: string
+  lunchEnd: string
   updatedBy: number
 }): Promise<EmployeeAvailabilityConfig> {
   const supabase = getServiceClient()
@@ -149,6 +165,10 @@ export async function saveEmployeeAvailabilityConfig(input: {
         topic_id: input.topicId,
         enabled: input.enabled,
         notification_time: input.notificationTime,
+        workday_start: input.workdayStart,
+        workday_end: input.workdayEnd,
+        lunch_start: input.lunchStart,
+        lunch_end: input.lunchEnd,
         created_by: input.updatedBy,
         updated_by: input.updatedBy,
       },
@@ -184,6 +204,33 @@ export async function addEmployeeAvailabilityPerson(input: {
   })
 
   if (error) throw new Error(`Failed to add employee availability person: ${error.message}`)
+}
+
+export async function updateEmployeeAvailabilityPerson(input: {
+  configId: string
+  personId: string
+  fullName: string
+  facultySlug: string
+  facultyName: string
+  groupSlug: string
+  groupName: string
+  course: number
+}) {
+  const supabase = getServiceClient()
+  const { error } = await supabase
+    .from('employee_availability_people')
+    .update({
+      full_name: input.fullName,
+      faculty_slug: input.facultySlug,
+      faculty_name: input.facultyName,
+      group_slug: input.groupSlug,
+      group_name: input.groupName,
+      course: input.course,
+    })
+    .eq('id', input.personId)
+    .eq('config_id', input.configId)
+
+  if (error) throw new Error(`Failed to update employee availability person: ${error.message}`)
 }
 
 export async function reorderEmployeeAvailabilityPeople(configId: string, personIds: string[]) {
