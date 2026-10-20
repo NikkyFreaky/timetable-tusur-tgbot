@@ -23,6 +23,10 @@ interface EmployeeAvailabilityConfig {
   id: string
   enabled: boolean
   notificationTime: string
+  workdayStart: string
+  workdayEnd: string
+  lunchStart: string
+  lunchEnd: string
   topicId: number | null
   people: EmployeeAvailabilityPerson[]
 }
@@ -36,7 +40,11 @@ interface EmployeeAvailabilitySettingsProps {
 
 const EMPTY_CONFIG: Omit<EmployeeAvailabilityConfig, 'id' | 'people'> = {
   enabled: false,
-  notificationTime: '08:00',
+  notificationTime: '09:00',
+  workdayStart: '09:00',
+  workdayEnd: '18:00',
+  lunchStart: '13:00',
+  lunchEnd: '14:00',
   topicId: null,
 }
 
@@ -120,6 +128,10 @@ export function EmployeeAvailabilitySettings({
         body: JSON.stringify({
           enabled: next.enabled,
           notificationTime: next.notificationTime,
+          workdayStart: next.workdayStart,
+          workdayEnd: next.workdayEnd,
+          lunchStart: next.lunchStart,
+          lunchEnd: next.lunchEnd,
           topicId: isForum ? next.topicId : null,
         }),
       })
@@ -354,6 +366,55 @@ export function EmployeeAvailabilitySettings({
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
           </button>
+
+          <div className="space-y-3 rounded-xl border border-border/60 bg-background/80 p-3">
+            <div>
+              <div className="text-sm font-medium text-foreground">Рабочее время</div>
+              <div className="text-xs text-muted-foreground">
+                Учитывается при расчёте свободного времени сотрудников
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Начало работы</span>
+                <Input
+                  type="time"
+                  value={values.workdayStart}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ workdayStart: event.target.value })}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Конец работы</span>
+                <Input
+                  type="time"
+                  value={values.workdayEnd}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ workdayEnd: event.target.value })}
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Начало обеда</span>
+                <Input
+                  type="time"
+                  value={values.lunchStart}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ lunchStart: event.target.value })}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Конец обеда</span>
+                <Input
+                  type="time"
+                  value={values.lunchEnd}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ lunchEnd: event.target.value })}
+                />
+              </label>
+            </div>
+          </div>
 
           {chatId && isForum && (
             <label className="block space-y-1">

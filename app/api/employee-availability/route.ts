@@ -74,15 +74,30 @@ export async function PUT(request: Request) {
     const body = await request.json().catch(() => null) as {
       enabled?: unknown
       notificationTime?: unknown
+      workdayStart?: unknown
+      workdayEnd?: unknown
+      lunchStart?: unknown
+      lunchEnd?: unknown
       topicId?: unknown
     } | null
     const existing = await getEmployeeAvailabilityConfig(target.kind, target.id)
     const enabled = typeof body?.enabled === 'boolean' ? body.enabled : existing?.enabled ?? false
-    const notificationTime = body?.notificationTime ?? existing?.notificationTime ?? '08:00'
+    const notificationTime = body?.notificationTime ?? existing?.notificationTime ?? '09:00'
+    const workdayStart = body?.workdayStart ?? existing?.workdayStart ?? '09:00'
+    const workdayEnd = body?.workdayEnd ?? existing?.workdayEnd ?? '18:00'
+    const lunchStart = body?.lunchStart ?? existing?.lunchStart ?? '13:00'
+    const lunchEnd = body?.lunchEnd ?? existing?.lunchEnd ?? '14:00'
     const rawTopicId = body?.topicId === undefined ? existing?.topicId ?? null : body.topicId
 
     if (!isTime(notificationTime)) {
       return NextResponse.json({ error: 'Некорректное время отправки' }, { status: 400 })
+    }
+    if (!isTime(workdayStart) || !isTime(workdayEnd) || !isTime(lunchStart) || !isTime(lunchEnd)) {
+      return NextResponse.json({ error: 'Некорректное время рабочего дня или обеда' }, { status: 400 })
+    }
+    if (workdayStart >= workdayEnd || lunchStart >= lunchEnd
+      || lunchStart < workdayStart || lunchEnd > workdayEnd) {
+      return NextResponse.json({ error: 'Обед должен находиться в пределах рабочего дня' }, { status: 400 })
     }
 
     let topicId: number | null = null
@@ -103,6 +118,10 @@ export async function PUT(request: Request) {
       topicId,
       enabled,
       notificationTime,
+      workdayStart,
+      workdayEnd,
+      lunchStart,
+      lunchEnd,
       updatedBy: auth.data.user.id,
     })
     return NextResponse.json({ config })
