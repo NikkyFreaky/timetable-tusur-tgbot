@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS employee_availability_configs (
   recipient_id BIGINT NOT NULL,
   topic_id BIGINT,
   enabled BOOLEAN NOT NULL DEFAULT FALSE,
-  notification_time TEXT NOT NULL DEFAULT '08:00'
+  notification_time TEXT NOT NULL DEFAULT '09:00'
     CHECK (notification_time ~ '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$'),
   created_by BIGINT,
   updated_by BIGINT,
