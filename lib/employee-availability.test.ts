@@ -87,7 +87,7 @@ describe('formatEmployeeAvailabilityReport', () => {
 
   it('формирует заголовок с датой', () => {
     expect(formatEmployeeAvailabilityReportTitle(new Date(2026, 9, 20)))
-      .toBe('<b>Сводка рабочего времени сотрудников на 20 октября:</b>')
+      .toBe('<b>Сводка рабочего времени сотрудников на 20.10.2026:</b>')
   })
 })
 

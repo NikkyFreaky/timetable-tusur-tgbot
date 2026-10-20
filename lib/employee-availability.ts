@@ -90,10 +90,11 @@ export function formatLessonAvailability(interval: TimeInterval | null): string 
 }
 
 export function formatEmployeeAvailabilityReportTitle(date: Date): string {
-  const formattedDate = new Intl.DateTimeFormat('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  }).format(date)
+  const formattedDate = [
+    String(date.getDate()).padStart(2, '0'),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getFullYear()),
+  ].join('.')
   return `<b>Сводка рабочего времени сотрудников на ${formattedDate}:</b>`
 }
 
