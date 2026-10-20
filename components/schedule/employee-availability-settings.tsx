@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Plus, Trash2, Users } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronRight, Clock, Plus, Trash2, Users } from 'lucide-react'
 import { GroupSearchDrawer } from '@/components/schedule/group-search-drawer'
 import { Input } from '@/components/ui/input'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { getTelegramInitDataHeaders, useTelegram } from '@/lib/telegram-context'
 import type { GroupSearchMatch } from '@/lib/group-search'
@@ -38,6 +39,23 @@ const EMPTY_CONFIG: Omit<EmployeeAvailabilityConfig, 'id' | 'people'> = {
   topicId: null,
 }
 
+const WHEEL_ITEM_HEIGHT = 44
+const WHEEL_VISIBLE_ITEMS = 5
+const WHEEL_CONTAINER_HEIGHT = WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ITEMS
+
+const parseNotificationTime = (value: string) => {
+  const [hourRaw, minuteRaw] = value.split(':')
+  const hour = Number(hourRaw)
+  const minute = Number(minuteRaw)
+  return {
+    hour: Number.isFinite(hour) ? Math.min(23, Math.max(0, hour)) : 8,
+    minute: Number.isFinite(minute) ? Math.min(59, Math.max(0, minute)) : 0,
+  }
+}
+
+const buildNotificationTime = (hour: number, minute: number) =>
+  `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+
 /** Настройки ежедневной сводки свободного времени. */
 export function EmployeeAvailabilitySettings({
   userId,
@@ -45,14 +63,19 @@ export function EmployeeAvailabilitySettings({
   isForum = false,
   topics = [],
 }: EmployeeAvailabilitySettingsProps) {
-  const { webApp } = useTelegram()
+  const { hapticFeedback, webApp } = useTelegram()
   const [allowed, setAllowed] = useState<boolean | null>(null)
   const [config, setConfig] = useState<EmployeeAvailabilityConfig | null>(null)
   const [fullName, setFullName] = useState('')
   const [group, setGroup] = useState<GroupSearchMatch | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [timePickerOpen, setTimePickerOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const hourScrollRef = useRef<HTMLDivElement | null>(null)
+  const minuteScrollRef = useRef<HTMLDivElement | null>(null)
+  const hourScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const minuteScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const query = chatId ? `?chatId=${chatId}` : ''
   const headers = getTelegramInitDataHeaders(webApp?.initData)
@@ -171,10 +194,35 @@ export function EmployeeAvailabilitySettings({
     }
   }
 
+  const values = { ...EMPTY_CONFIG, ...config }
+  const timeParts = parseNotificationTime(values.notificationTime)
+  const hours = Array.from({ length: 24 }, (_, index) => index)
+  const minutes = Array.from({ length: 60 }, (_, index) => index)
+
+  const snapWheelScroll = (element: HTMLDivElement | null, index: number, maxIndex: number) => {
+    if (!element) return
+    element.scrollTo({
+      top: Math.min(maxIndex, Math.max(0, index)) * WHEEL_ITEM_HEIGHT,
+      behavior: 'smooth',
+    })
+  }
+
+  useEffect(() => {
+    if (!timePickerOpen) return
+    const timer = setTimeout(() => {
+      snapWheelScroll(hourScrollRef.current, timeParts.hour, 23)
+      snapWheelScroll(minuteScrollRef.current, timeParts.minute, 59)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [timePickerOpen, timeParts.hour, timeParts.minute])
+
+  useEffect(() => () => {
+    if (hourScrollTimeout.current) clearTimeout(hourScrollTimeout.current)
+    if (minuteScrollTimeout.current) clearTimeout(minuteScrollTimeout.current)
+  }, [])
+
   if (!userId || allowed === false) return null
   if (allowed === null) return <div className="px-4 py-3 text-sm text-muted-foreground">Загрузка сводки сотрудников...</div>
-
-  const values = { ...EMPTY_CONFIG, ...config }
 
   return (
     <section className="px-4 mb-6">
@@ -202,15 +250,26 @@ export function EmployeeAvailabilitySettings({
         </div>
 
         <div className="space-y-3 border-t border-border p-4">
-          <label className="block space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Время отправки</span>
-            <Input
-              type="time"
-              value={values.notificationTime}
-              disabled={saving}
-              onChange={(event) => void saveConfig({ notificationTime: event.target.value })}
-            />
-          </label>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => {
+              hapticFeedback('light')
+              setTimePickerOpen(true)
+            }}
+            className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-background/80 p-3 text-left disabled:opacity-50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
+                <Clock className="h-5 w-5 text-blue-500" />
+              </div>
+              <span className="text-sm font-medium text-foreground">Время отправки</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{values.notificationTime}</span>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </div>
+          </button>
 
           {chatId && isForum && (
             <label className="block space-y-1">
@@ -285,6 +344,109 @@ export function EmployeeAvailabilitySettings({
         </div>
       </div>
       <GroupSearchDrawer open={searchOpen} onOpenChange={setSearchOpen} onSelectGroup={setGroup} />
+      <Sheet open={timePickerOpen} onOpenChange={setTimePickerOpen}>
+        <SheetContent side="bottom" className="rounded-t-3xl px-0">
+          <SheetHeader className="border-b border-border px-4 pb-4">
+            <SheetTitle className="mx-auto text-lg">Время отправки</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-6 px-4 py-4">
+            <div className="text-center">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Время отправки сводки
+              </div>
+              <div className="text-4xl font-semibold tracking-[0.08em] text-foreground">
+                {values.notificationTime}
+              </div>
+            </div>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 rounded-3xl border border-border/60 bg-card/70 p-4 shadow-sm backdrop-blur">
+              <div className="relative">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Час</div>
+                <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/60 shadow-inner backdrop-blur-sm" style={{ height: WHEEL_CONTAINER_HEIGHT }}>
+                  <div
+                    ref={hourScrollRef}
+                    onScroll={() => {
+                      if (hourScrollTimeout.current) clearTimeout(hourScrollTimeout.current)
+                      hourScrollTimeout.current = setTimeout(() => {
+                        const element = hourScrollRef.current
+                        if (!element) return
+                        const hour = Math.min(23, Math.max(0, Math.round(element.scrollTop / WHEEL_ITEM_HEIGHT)))
+                        if (hour !== timeParts.hour) {
+                          hapticFeedback('selection')
+                          void saveConfig({ notificationTime: buildNotificationTime(hour, timeParts.minute) })
+                        }
+                        snapWheelScroll(element, hour, 23)
+                      }, 120)
+                    }}
+                    className="h-full snap-y snap-mandatory overflow-y-auto scrollbar-none"
+                    style={{ paddingBlock: WHEEL_ITEM_HEIGHT * 2 }}
+                  >
+                    {hours.map((hour) => (
+                      <button
+                        key={hour}
+                        type="button"
+                        onClick={() => {
+                          hapticFeedback('selection')
+                          void saveConfig({ notificationTime: buildNotificationTime(hour, timeParts.minute) })
+                        }}
+                        className={`flex h-11 w-full snap-center items-center justify-center text-lg font-semibold transition-colors ${hour === timeParts.hour ? 'text-2xl text-foreground' : 'text-muted-foreground/60'}`}
+                      >
+                        {String(hour).padStart(2, '0')}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-background/90 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/90 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-3 top-1/2 h-11 -translate-y-1/2 rounded-xl bg-foreground/5" />
+                  <div className="pointer-events-none absolute inset-x-3 top-1/2 h-11 -translate-y-1/2 border-y border-foreground/20" />
+                </div>
+              </div>
+              <div className="text-4xl font-semibold text-muted-foreground/70">:</div>
+              <div className="relative">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Минуты</div>
+                <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/60 shadow-inner backdrop-blur-sm" style={{ height: WHEEL_CONTAINER_HEIGHT }}>
+                  <div
+                    ref={minuteScrollRef}
+                    onScroll={() => {
+                      if (minuteScrollTimeout.current) clearTimeout(minuteScrollTimeout.current)
+                      minuteScrollTimeout.current = setTimeout(() => {
+                        const element = minuteScrollRef.current
+                        if (!element) return
+                        const minute = Math.min(59, Math.max(0, Math.round(element.scrollTop / WHEEL_ITEM_HEIGHT)))
+                        if (minute !== timeParts.minute) {
+                          hapticFeedback('selection')
+                          void saveConfig({ notificationTime: buildNotificationTime(timeParts.hour, minute) })
+                        }
+                        snapWheelScroll(element, minute, 59)
+                      }, 120)
+                    }}
+                    className="h-full snap-y snap-mandatory overflow-y-auto scrollbar-none"
+                    style={{ paddingBlock: WHEEL_ITEM_HEIGHT * 2 }}
+                  >
+                    {minutes.map((minute) => (
+                      <button
+                        key={minute}
+                        type="button"
+                        onClick={() => {
+                          hapticFeedback('selection')
+                          void saveConfig({ notificationTime: buildNotificationTime(timeParts.hour, minute) })
+                        }}
+                        className={`flex h-11 w-full snap-center items-center justify-center text-lg font-semibold transition-colors ${minute === timeParts.minute ? 'text-2xl text-foreground' : 'text-muted-foreground/60'}`}
+                      >
+                        {String(minute).padStart(2, '0')}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-background/90 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/90 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-3 top-1/2 h-11 -translate-y-1/2 rounded-xl bg-foreground/5" />
+                  <div className="pointer-events-none absolute inset-x-3 top-1/2 h-11 -translate-y-1/2 border-y border-foreground/20" />
+                </div>
+              </div>
+            </div>
+            <div className="text-center text-xs text-muted-foreground">Прокрутите, чтобы выбрать время, как в будильнике.</div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </section>
   )
 }
