@@ -115,14 +115,18 @@ const escapeHtml = (value: string) => value
   .replaceAll('<', '&lt;')
   .replaceAll('>', '&gt;')
 
+const escapeHtmlAttribute = (value: string) => escapeHtml(value).replaceAll('"', '&quot;')
+
 export function formatEmployeeAvailabilityReport(input: {
   fullName: string
   groupName: string
+  timetableUrl: string
   lessons: Lesson[]
 }): string {
   const summary = getEmployeeAvailabilitySummary(input.lessons)
+  const groupLink = `<a href="${escapeHtmlAttribute(input.timetableUrl)}">${escapeHtml(input.groupName)}</a>`
   const lines = [
-    `<b>• ${escapeHtml(input.fullName)} (${escapeHtml(input.groupName)}):</b>`,
+    `<b>• ${escapeHtml(input.fullName)} (${groupLink}):</b>`,
     `  – на работе: ${formatAvailability(summary.workIntervals)}`,
   ]
   if (summary.lessonInterval) {
