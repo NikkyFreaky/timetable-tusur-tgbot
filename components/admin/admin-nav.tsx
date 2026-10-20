@@ -16,6 +16,7 @@ const navItems = [
   { href: '/admin/users', label: 'Пользователи' },
   { href: '/admin/chats', label: 'Чаты' },
   { href: '/admin/bot', label: 'Сообщения' },
+  { href: '/admin/employee-availability', label: 'Сводки' },
   { href: '/admin/admins', label: 'Администраторы' },
   { href: '/admin/settings', label: 'Настройки' },
 ]

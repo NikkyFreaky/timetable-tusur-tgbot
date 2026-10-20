@@ -14,6 +14,7 @@ import type { ChatTopic } from "@/lib/schedule-types"
 import { getTelegramInitDataHeaders, useTelegram } from "@/lib/telegram-context"
 import type { CourseOption, FacultyOption, GroupOption } from "@/lib/timetable-types"
 import { type GroupSearchMatch, normalizeSearchValue, buildGroupSearchMatches } from "@/lib/group-search"
+import { EmployeeAvailabilitySettings } from "@/components/schedule/employee-availability-settings"
 
 interface SettingsPanelProps {
   open: boolean
@@ -1104,6 +1105,8 @@ export function SettingsPanel({
                 </div>
               </div>
 
+              <EmployeeAvailabilitySettings userId={userId} />
+
               {/* Reset */}
               <div className="px-4">
                 <button
@@ -1233,6 +1236,13 @@ export function SettingsPanel({
                               </div>
                             </div>
                           )}
+
+                          <EmployeeAvailabilitySettings
+                            userId={userId}
+                            chatId={selectedChat.id}
+                            isForum={selectedChat.isForum}
+                            topics={topics}
+                          />
 
                           {/* Group Selection */}
                           <div className="px-4 mb-6">

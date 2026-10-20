@@ -12,6 +12,15 @@ import type { NotificationState } from "@/lib/notification-state"
 import { claimNotificationDispatch } from '@/lib/notification-dispatch-store'
 import { listUsersWithSettings, updateUsersNotificationState } from "@/lib/user-store"
 import { listChatsWithSettings, updateChatsNotificationState } from "@/lib/chat-store"
+import {
+  isEmployeeAvailabilityRecipientActive,
+  listEnabledEmployeeAvailabilityConfigs,
+} from '@/lib/employee-availability-store'
+import {
+  formatAvailability,
+  getAvailableWorkIntervals,
+  splitTelegramMessage,
+} from '@/lib/employee-availability'
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -239,6 +248,68 @@ function isVacationDay(schedule: DaySchedule) {
 
 function isHolidayDay(schedule: DaySchedule) {
   return schedule.specialDay?.type === "holiday"
+}
+
+async function dispatchEmployeeAvailabilityReports(input: {
+  botToken: string
+  now: Date
+  dispatchKey: string
+  scheduleCache: ScheduleCache
+}) {
+  if (getDayIndex(input.now) >= 5) return { sent: 0, skipped: 0, errors: 0 }
+
+  let sent = 0
+  let skipped = 0
+  let errors = 0
+  const configs = await listEnabledEmployeeAvailabilityConfigs()
+
+  for (const config of configs) {
+    if (!shouldSendForTime(input.now, config.notificationTime) || config.people.length === 0) {
+      skipped += 1
+      continue
+    }
+
+    try {
+      if (!await isEmployeeAvailabilityRecipientActive(config.recipientKind, config.recipientId)) {
+        skipped += 1
+        continue
+      }
+
+      const lines = await Promise.all(config.people.map(async (person) => {
+        const schedule = await getScheduleForDate(
+          person.facultySlug,
+          person.groupSlug,
+          input.now,
+          input.scheduleCache
+        )
+        return `${person.fullName} — ${formatAvailability(getAvailableWorkIntervals(schedule.lessons))}.`
+      }))
+
+      const claimed = await claimNotificationDispatch({
+        recipientKind: config.recipientKind,
+        recipientId: config.recipientId,
+        notificationType: 'employee_availability',
+        dispatchKey: input.dispatchKey,
+      })
+      if (!claimed) {
+        skipped += 1
+        continue
+      }
+
+      for (const message of splitTelegramMessage(lines)) {
+        await sendTelegramMessage(input.botToken, config.recipientId, message, {
+          disableWebPagePreview: true,
+          messageThreadId: config.topicId ?? undefined,
+        })
+        sent += 1
+      }
+    } catch (error) {
+      console.error(`Failed to send employee availability report to ${config.recipientKind} ${config.recipientId}:`, error)
+      errors += 1
+    }
+  }
+
+  return { sent, skipped, errors }
 }
 
 export async function GET(request: Request) {
@@ -480,11 +551,19 @@ export async function GET(request: Request) {
   await updateUsersNotificationState(userStateUpdates)
   await updateChatsNotificationState(chatStateUpdates)
 
+  const employeeAvailability = await dispatchEmployeeAvailabilityReports({
+    botToken,
+    now,
+    dispatchKey: `${todayKey} ${timeKey}`,
+    scheduleCache,
+  })
+
   return NextResponse.json({
     ok: true,
     now: now.toISOString(),
     sent: sentCount,
     skipped: skippedCount,
     errors: errorCount,
+    employeeAvailability,
   })
 }

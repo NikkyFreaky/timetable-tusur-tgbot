@@ -313,6 +313,121 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_availability_access: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          is_active: boolean
+          telegram_user_id: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          is_active?: boolean
+          telegram_user_id: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          is_active?: boolean
+          telegram_user_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_availability_access_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_availability_configs: {
+        Row: {
+          created_at: string
+          created_by: number | null
+          enabled: boolean
+          id: string
+          notification_time: string
+          recipient_id: number
+          recipient_kind: string
+          topic_id: number | null
+          updated_at: string
+          updated_by: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: number | null
+          enabled?: boolean
+          id?: string
+          notification_time?: string
+          recipient_id: number
+          recipient_kind: string
+          topic_id?: number | null
+          updated_at?: string
+          updated_by?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: number | null
+          enabled?: boolean
+          id?: string
+          notification_time?: string
+          recipient_id?: number
+          recipient_kind?: string
+          topic_id?: number | null
+          updated_at?: string
+          updated_by?: number | null
+        }
+        Relationships: []
+      }
+      employee_availability_people: {
+        Row: {
+          config_id: string
+          course: number
+          created_at: string
+          faculty_name: string
+          faculty_slug: string
+          full_name: string
+          group_name: string
+          group_slug: string
+          id: string
+        }
+        Insert: {
+          config_id: string
+          course: number
+          created_at?: string
+          faculty_name: string
+          faculty_slug: string
+          full_name: string
+          group_name: string
+          group_slug: string
+          id?: string
+        }
+        Update: {
+          config_id?: string
+          course?: number
+          created_at?: string
+          faculty_name?: string
+          faculty_slug?: string
+          full_name?: string
+          group_name?: string
+          group_slug?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_availability_people_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "employee_availability_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_change_history: {
         Row: {
           changes: Json
