@@ -69,7 +69,9 @@ export function getEmployeeAvailabilitySummary(lessons: Lesson[]): EmployeeAvail
 
   return {
     lessonInterval,
-    workIntervals: excludeLunch(workIntervals.filter((interval) => interval.end > interval.start)),
+    workIntervals: lessonInterval
+      ? excludeLunch(workIntervals.filter((interval) => interval.end > interval.start))
+      : workIntervals,
   }
 }
 
@@ -109,11 +111,14 @@ export function formatEmployeeAvailabilityReport(input: {
   lessons: Lesson[]
 }): string {
   const summary = getEmployeeAvailabilitySummary(input.lessons)
-  return [
+  const lines = [
     `<b>• ${escapeHtml(input.fullName)} (${escapeHtml(input.groupName)}):</b>`,
     `  – на работе: ${formatAvailability(summary.workIntervals)}`,
-    `  – на парах: ${formatLessonAvailability(summary.lessonInterval)}`,
-  ].join('\n')
+  ]
+  if (summary.lessonInterval) {
+    lines.push(`  – на парах: ${formatLessonAvailability(summary.lessonInterval)}`)
+  }
+  return lines.join('\n')
 }
 
 export function splitTelegramMessage(lines: string[], maxLength = 4096, separator = '\n'): string[] {

@@ -22,11 +22,8 @@ const lesson = (time: string, timeEnd: string, isCancelled = false): Lesson => (
 })
 
 describe('getAvailableWorkIntervals', () => {
-  it('исключает обед из рабочего дня без пар', () => {
-    expect(getAvailableWorkIntervals([])).toEqual([
-      { start: 540, end: 780 },
-      { start: 840, end: 1080 },
-    ])
+  it('оставляет полный рабочий день без пар', () => {
+    expect(getAvailableWorkIntervals([])).toEqual([{ start: 540, end: 1080 }])
   })
 
   it('не считает перерывы между парами рабочим временем', () => {
@@ -58,7 +55,7 @@ describe('getAvailableWorkIntervals', () => {
       lesson('18:10', '19:40'),
     ])
 
-    expect(formatAvailability(intervals)).toBe('с 09:00 до 13:00 и с 14:00 до 18:00')
+    expect(formatAvailability(intervals)).toBe('с 09:00 до 18:00')
   })
 
   it('не оставляет рабочее время после пары, пересекающей окончание дня', () => {
@@ -82,6 +79,17 @@ describe('formatEmployeeAvailabilityReport', () => {
       '<b>• Виктор Головенко (593-1):</b>',
       '  – на работе: с 09:00 до 10:20',
       '  – на парах: с 10:40 до 18:20',
+    ].join('\n'))
+  })
+
+  it('не упоминает пары при полном рабочем дне', () => {
+    expect(formatEmployeeAvailabilityReport({
+      fullName: 'Егор Мартыненко',
+      groupName: '405-М',
+      lessons: [],
+    })).toBe([
+      '<b>• Егор Мартыненко (405-М):</b>',
+      '  – на работе: с 09:00 до 18:00',
     ].join('\n'))
   })
 
