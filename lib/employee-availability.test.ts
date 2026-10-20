@@ -75,9 +75,10 @@ describe('formatEmployeeAvailabilityReport', () => {
     expect(formatEmployeeAvailabilityReport({
       fullName: 'Виктор Головенко',
       groupName: '593-1',
+      timetableUrl: 'https://timetable.tusur.ru/faculties/fvs/groups/593-1?week_id=846',
       lessons: [lesson('10:40', '18:20')],
     })).toBe([
-      '<b>• Виктор Головенко (593-1):</b>',
+      '<b>• Виктор Головенко (<a href="https://timetable.tusur.ru/faculties/fvs/groups/593-1?week_id=846">593-1</a>):</b>',
       '  – на работе: с 09:00 до 10:20',
       '  – на парах: с 10:40 до 18:20',
     ].join('\n'))
@@ -87,9 +88,10 @@ describe('formatEmployeeAvailabilityReport', () => {
     expect(formatEmployeeAvailabilityReport({
       fullName: 'Егор Мартыненко',
       groupName: '405-М',
+      timetableUrl: 'https://timetable.tusur.ru/faculties/fvs/groups/405-m?week_id=846',
       lessons: [],
     })).toBe([
-      '<b>• Егор Мартыненко (405-М):</b>',
+      '<b>• Егор Мартыненко (<a href="https://timetable.tusur.ru/faculties/fvs/groups/405-m?week_id=846">405-М</a>):</b>',
       '  – на работе: с 09:00 до 18:00',
     ].join('\n'))
   })

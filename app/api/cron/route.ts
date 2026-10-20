@@ -6,7 +6,7 @@ import {
   getWeekType,
   formatDayDate,
 } from "@/lib/schedule-data"
-import { fetchWeekSchedule } from "@/lib/timetable"
+import { buildTimetableUrlForWeek, fetchWeekSchedule } from "@/lib/timetable"
 import { sendTelegramMessage } from "@/lib/telegram-bot"
 import type { NotificationState } from "@/lib/notification-state"
 import { claimNotificationDispatch } from '@/lib/notification-dispatch-store'
@@ -277,16 +277,24 @@ async function dispatchEmployeeAvailabilityReports(input: {
       }
 
       const reportLines = await Promise.all(config.people.map(async (person) => {
-        const schedule = await getScheduleForDate(
-          person.facultySlug,
-          person.groupSlug,
-          input.now,
-          input.scheduleCache
-        )
+        const [schedule, timetableUrl] = await Promise.all([
+          getScheduleForDate(
+            person.facultySlug,
+            person.groupSlug,
+            input.now,
+            input.scheduleCache
+          ),
+          buildTimetableUrlForWeek(
+            person.facultySlug,
+            person.groupSlug,
+            getMondayOfWeek(input.now)
+          ),
+        ])
         if (!shouldIncludeEmployeeAvailabilityReport(schedule.lessons)) return null
         return formatEmployeeAvailabilityReport({
           fullName: person.fullName,
           groupName: person.groupName,
+          timetableUrl,
           lessons: schedule.lessons,
         })
       }))
