@@ -4,6 +4,7 @@ import {
   deleteEmployeeAvailabilityPerson,
   getEmployeeAvailabilityConfig,
   hasEmployeeAvailabilityAccess,
+  reorderEmployeeAvailabilityPeople,
   saveEmployeeAvailabilityConfig,
 } from '@/lib/employee-availability-store'
 import { getChatById, getChatMemberRole, listChatTopics } from '@/lib/chat-store'
@@ -137,11 +138,38 @@ export async function POST(request: Request) {
       groupSlug,
       groupName,
       course,
+      sortOrder: Math.max(-1, ...config.people.map((person) => person.sortOrder)) + 1,
     })
     return NextResponse.json({ config: await getEmployeeAvailabilityConfig(target.kind, target.id) })
   } catch (error) {
     console.error('Failed to add employee availability person:', error)
     return NextResponse.json({ error: 'Не удалось добавить сотрудника' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const target = await getTarget(request)
+    if (isTargetResponse(target)) return target
+    const config = await getEmployeeAvailabilityConfig(target.kind, target.id)
+    if (!config) return NextResponse.json({ error: 'Список сотрудников не найден' }, { status: 404 })
+
+    const body = await request.json().catch(() => null) as { personIds?: unknown } | null
+    const personIds = Array.isArray(body?.personIds) ? body.personIds : []
+    if (
+      personIds.length !== config.people.length
+      || !personIds.every((personId): personId is string => typeof personId === 'string')
+      || new Set(personIds).size !== personIds.length
+      || !config.people.every((person) => personIds.includes(person.id))
+    ) {
+      return NextResponse.json({ error: 'Некорректный порядок сотрудников' }, { status: 400 })
+    }
+
+    await reorderEmployeeAvailabilityPeople(config.id, personIds)
+    return NextResponse.json({ config: await getEmployeeAvailabilityConfig(target.kind, target.id) })
+  } catch (error) {
+    console.error('Failed to reorder employee availability people:', error)
+    return NextResponse.json({ error: 'Не удалось изменить порядок сотрудников' }, { status: 500 })
   }
 }
 

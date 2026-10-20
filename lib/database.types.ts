@@ -395,6 +395,7 @@ export type Database = {
           group_name: string
           group_slug: string
           id: string
+          sort_order: number
         }
         Insert: {
           config_id: string
@@ -406,6 +407,7 @@ export type Database = {
           group_name: string
           group_slug: string
           id?: string
+          sort_order?: number
         }
         Update: {
           config_id?: string
@@ -417,6 +419,7 @@ export type Database = {
           group_name?: string
           group_slug?: string
           id?: string
+          sort_order?: number
         }
         Relationships: [
           {

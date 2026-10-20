@@ -11,6 +11,7 @@ export interface EmployeeAvailabilityPerson {
   groupSlug: string
   groupName: string
   course: number
+  sortOrder: number
 }
 
 export interface EmployeeAvailabilityConfig {
@@ -38,6 +39,7 @@ type ConfigRow = {
     group_slug: string
     group_name: string
     course: number
+    sort_order: number
   }>
 }
 
@@ -64,7 +66,8 @@ function mapConfig(row: ConfigRow): EmployeeAvailabilityConfig {
       groupSlug: person.group_slug,
       groupName: person.group_name,
       course: person.course,
-    })),
+      sortOrder: person.sort_order,
+    })).sort((left, right) => left.sortOrder - right.sortOrder),
   }
 }
 
@@ -166,6 +169,7 @@ export async function addEmployeeAvailabilityPerson(input: {
   groupSlug: string
   groupName: string
   course: number
+  sortOrder: number
 }) {
   const supabase = getServiceClient()
   const { error } = await supabase.from('employee_availability_people').insert({
@@ -176,9 +180,22 @@ export async function addEmployeeAvailabilityPerson(input: {
     group_slug: input.groupSlug,
     group_name: input.groupName,
     course: input.course,
+    sort_order: input.sortOrder,
   })
 
   if (error) throw new Error(`Failed to add employee availability person: ${error.message}`)
+}
+
+export async function reorderEmployeeAvailabilityPeople(configId: string, personIds: string[]) {
+  const supabase = getServiceClient()
+  const results = await Promise.all(personIds.map((personId, sortOrder) => supabase
+    .from('employee_availability_people')
+    .update({ sort_order: sortOrder })
+    .eq('id', personId)
+    .eq('config_id', configId)
+  ))
+  const error = results.find((result) => result.error)?.error
+  if (error) throw new Error(`Failed to reorder employee availability people: ${error.message}`)
 }
 
 export async function deleteEmployeeAvailabilityPerson(configId: string, personId: string) {

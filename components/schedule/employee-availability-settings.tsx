@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, Clock, Plus, Trash2, Users } from 'lucide-react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { ChevronRight, Clock, GripVertical, Plus, Trash2, Users } from 'lucide-react'
 import { GroupSearchDrawer } from '@/components/schedule/group-search-drawer'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -16,6 +16,7 @@ interface EmployeeAvailabilityPerson {
   facultyName: string
   groupName: string
   course: number
+  sortOrder: number
 }
 
 interface EmployeeAvailabilityConfig {
@@ -72,10 +73,13 @@ export function EmployeeAvailabilitySettings({
   const [timePickerOpen, setTimePickerOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [draggedPersonId, setDraggedPersonId] = useState<string | null>(null)
   const hourScrollRef = useRef<HTMLDivElement | null>(null)
   const minuteScrollRef = useRef<HTMLDivElement | null>(null)
   const hourScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const minuteScrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const peopleOrderRef = useRef<EmployeeAvailabilityPerson[]>([])
+  const dragStartOrderRef = useRef<string[] | null>(null)
 
   const query = chatId ? `?chatId=${chatId}` : ''
   const headers = getTelegramInitDataHeaders(webApp?.initData)
@@ -194,6 +198,79 @@ export function EmployeeAvailabilitySettings({
     }
   }
 
+  const savePeopleOrder = async () => {
+    const personIds = peopleOrderRef.current.map((person) => person.id)
+    if (!config || personIds.length === 0) return
+
+    setSaving(true)
+    setMessage('')
+    try {
+      const response = await fetch(`/api/employee-availability${query}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ personIds }),
+      })
+      const data = await response.json().catch(() => ({})) as {
+        config?: EmployeeAvailabilityConfig
+        error?: string
+      }
+      if (!response.ok || !data.config) throw new Error(data.error ?? 'Не удалось изменить порядок сотрудников')
+      setConfig(data.config)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Не удалось изменить порядок сотрудников')
+      void load()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const movePerson = (personId: string, targetPersonId: string) => {
+    if (personId === targetPersonId) return
+    setConfig((current) => {
+      if (!current) return current
+      const fromIndex = current.people.findIndex((person) => person.id === personId)
+      const targetIndex = current.people.findIndex((person) => person.id === targetPersonId)
+      if (fromIndex < 0 || targetIndex < 0) return current
+
+      const people = [...current.people]
+      const [person] = people.splice(fromIndex, 1)
+      people.splice(targetIndex, 0, person)
+      peopleOrderRef.current = people
+      return { ...current, people }
+    })
+  }
+
+  const handlePersonPointerDown = (event: PointerEvent<HTMLButtonElement>, personId: string) => {
+    if (saving) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    dragStartOrderRef.current = peopleOrderRef.current.map((person) => person.id)
+    setDraggedPersonId(personId)
+    hapticFeedback('selection')
+  }
+
+  const handlePersonPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!draggedPersonId) return
+    const target = event.currentTarget.ownerDocument
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-employee-person-id]')
+      ?.dataset.employeePersonId
+    if (target) movePerson(draggedPersonId, target)
+  }
+
+  const handlePersonPointerEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!draggedPersonId) return
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    setDraggedPersonId(null)
+    const startOrder = dragStartOrderRef.current
+    dragStartOrderRef.current = null
+    if (startOrder?.join(',') !== peopleOrderRef.current.map((person) => person.id).join(',')) {
+      void savePeopleOrder()
+    }
+  }
+
   const values = { ...EMPTY_CONFIG, ...config }
   const timeParts = parseNotificationTime(values.notificationTime)
   const hours = Array.from({ length: 24 }, (_, index) => index)
@@ -220,6 +297,10 @@ export function EmployeeAvailabilitySettings({
     if (hourScrollTimeout.current) clearTimeout(hourScrollTimeout.current)
     if (minuteScrollTimeout.current) clearTimeout(minuteScrollTimeout.current)
   }, [])
+
+  useEffect(() => {
+    peopleOrderRef.current = config?.people ?? []
+  }, [config])
 
   if (!userId || allowed === false) return null
   if (allowed === null) return <div className="px-4 py-3 text-sm text-muted-foreground">Загрузка сводки сотрудников...</div>
@@ -249,7 +330,10 @@ export function EmployeeAvailabilitySettings({
           />
         </div>
 
-        <div className="space-y-3 border-t border-border p-4">
+        {message && !values.enabled && <div className="border-t border-border px-4 pb-3 pt-2 text-sm text-destructive">{message}</div>}
+
+        {values.enabled && (
+          <div className="space-y-3 border-t border-border p-4">
           <button
             type="button"
             disabled={saving}
@@ -319,9 +403,27 @@ export function EmployeeAvailabilitySettings({
           {message && <div className="text-sm text-destructive">{message}</div>}
 
           {(config?.people.length ?? 0) > 0 && (
-            <div className="divide-y divide-border rounded-lg border border-border">
+            <div className="space-y-2">
+              <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Список сотрудников</div>
+              <div className="divide-y divide-border rounded-lg border border-border">
               {config?.people.map((person) => (
-                <div key={person.id} className="flex items-center justify-between gap-3 p-3">
+                <div
+                  key={person.id}
+                  data-employee-person-id={person.id}
+                  className={`flex items-center justify-between gap-2 p-3 transition-opacity ${draggedPersonId === person.id ? 'opacity-50' : ''}`}
+                >
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onPointerDown={(event) => handlePersonPointerDown(event, person.id)}
+                    onPointerMove={handlePersonPointerMove}
+                    onPointerUp={handlePersonPointerEnd}
+                    onPointerCancel={handlePersonPointerEnd}
+                    className="touch-none rounded-md p-2 text-muted-foreground active:cursor-grabbing disabled:opacity-50"
+                    aria-label={`Изменить порядок: ${person.fullName}`}
+                  >
+                    <GripVertical className="h-5 w-5" />
+                  </button>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{person.fullName}</div>
                     <div className="truncate text-xs text-muted-foreground">
@@ -339,9 +441,11 @@ export function EmployeeAvailabilitySettings({
                   </button>
                 </div>
               ))}
+              </div>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
       <GroupSearchDrawer open={searchOpen} onOpenChange={setSearchOpen} onSelectGroup={setGroup} />
       <Sheet open={timePickerOpen} onOpenChange={setTimePickerOpen}>
