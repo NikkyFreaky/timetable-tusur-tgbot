@@ -89,6 +89,14 @@ export function formatLessonAvailability(interval: TimeInterval | null): string 
   return `с ${formatWorkTime(interval.start)} до ${formatWorkTime(interval.end)}`
 }
 
+export function formatEmployeeAvailabilityReportTitle(date: Date): string {
+  const formattedDate = new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  }).format(date)
+  return `<b>Сводка рабочего времени сотрудников на ${formattedDate}:</b>`
+}
+
 const escapeHtml = (value: string) => value
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -101,9 +109,9 @@ export function formatEmployeeAvailabilityReport(input: {
 }): string {
   const summary = getEmployeeAvailabilitySummary(input.lessons)
   return [
-    `<b>${escapeHtml(input.fullName)}</b> (${escapeHtml(input.groupName)}):`,
-    `  – <b>на работе:</b> ${formatAvailability(summary.workIntervals)}`,
-    `  – <b>на парах:</b> ${formatLessonAvailability(summary.lessonInterval)}`,
+    `<b>• ${escapeHtml(input.fullName)} (${escapeHtml(input.groupName)}):</b>`,
+    `  – на работе: ${formatAvailability(summary.workIntervals)}`,
+    `  – на парах: ${formatLessonAvailability(summary.lessonInterval)}`,
   ].join('\n')
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatEmployeeAvailabilityReport,
+  formatEmployeeAvailabilityReportTitle,
   formatAvailability,
   formatLessonAvailability,
   getEmployeeAvailabilitySummary,
@@ -72,16 +73,21 @@ describe('getAvailableWorkIntervals', () => {
 })
 
 describe('formatEmployeeAvailabilityReport', () => {
-  it('формирует сообщение с ФИО, группой и выделенными полями', () => {
+  it('формирует блок сотрудника с ФИО и группой', () => {
     expect(formatEmployeeAvailabilityReport({
       fullName: 'Виктор Головенко',
       groupName: '593-1',
       lessons: [lesson('10:40', '18:20')],
     })).toBe([
-      '<b>Виктор Головенко</b> (593-1):',
-      '  – <b>на работе:</b> с 09:00 до 10:20',
-      '  – <b>на парах:</b> с 10:40 до 18:20',
+      '<b>• Виктор Головенко (593-1):</b>',
+      '  – на работе: с 09:00 до 10:20',
+      '  – на парах: с 10:40 до 18:20',
     ].join('\n'))
+  })
+
+  it('формирует заголовок с датой', () => {
+    expect(formatEmployeeAvailabilityReportTitle(new Date(2026, 9, 20)))
+      .toBe('<b>Сводка рабочего времени сотрудников на 20 октября:</b>')
   })
 })
 

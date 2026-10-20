@@ -18,6 +18,7 @@ import {
 } from '@/lib/employee-availability-store'
 import {
   formatEmployeeAvailabilityReport,
+  formatEmployeeAvailabilityReportTitle,
   splitTelegramMessage,
 } from '@/lib/employee-availability'
 
@@ -299,8 +300,10 @@ async function dispatchEmployeeAvailabilityReports(input: {
         continue
       }
 
-      for (const message of splitTelegramMessage(lines, 4096, '\n\n')) {
-        await sendTelegramMessage(input.botToken, config.recipientId, message, {
+      const title = formatEmployeeAvailabilityReportTitle(input.now)
+      const messages = splitTelegramMessage(lines, 4096 - title.length - 2, '\n\n')
+      for (const message of messages) {
+        await sendTelegramMessage(input.botToken, config.recipientId, `${title}\n\n${message}`, {
           parseMode: 'HTML',
           disableWebPagePreview: true,
           messageThreadId: config.topicId ?? undefined,
