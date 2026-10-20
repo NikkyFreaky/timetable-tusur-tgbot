@@ -2,6 +2,9 @@ import type { Lesson } from '@/lib/schedule-types'
 
 export const WORKDAY_START = 9 * 60
 export const WORKDAY_END = 18 * 60
+export const LUNCH_START = 13 * 60
+export const LUNCH_END = 14 * 60
+export const TRAVEL_TIME = 20
 
 export interface TimeInterval {
   start: number
@@ -21,37 +24,57 @@ export const formatWorkTime = (value: number): string => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-/** Возвращает интервалы работы вне активных пар. */
-export function getAvailableWorkIntervals(lessons: Lesson[]): TimeInterval[] {
-  const busy = lessons
+export interface EmployeeAvailabilitySummary {
+  workIntervals: TimeInterval[]
+  lessonInterval: TimeInterval | null
+}
+
+const getLessonInterval = (lessons: Lesson[]): TimeInterval | null => {
+  const intervals = lessons
     .filter((lesson) => !lesson.isCancelled)
     .map((lesson) => {
       const start = parseTime(lesson.time)
       const end = parseTime(lesson.timeEnd)
       if (start === null || end === null || end <= start || start >= WORKDAY_END) return null
-      return { start: Math.max(start, WORKDAY_START), end: Math.min(end, WORKDAY_END) }
+      return { start: Math.max(start, WORKDAY_START), end }
     })
     .filter((interval): interval is TimeInterval => Boolean(interval && interval.end > interval.start))
     .sort((left, right) => left.start - right.start)
 
-  const merged: TimeInterval[] = []
-  for (const interval of busy) {
-    const previous = merged.at(-1)
-    if (previous && interval.start <= previous.end) {
-      previous.end = Math.max(previous.end, interval.end)
-    } else {
-      merged.push({ ...interval })
-    }
+  if (intervals.length === 0) return null
+  return {
+    start: intervals[0].start,
+    end: Math.max(...intervals.map((interval) => interval.end)),
   }
+}
 
-  const available: TimeInterval[] = []
-  let cursor = WORKDAY_START
-  for (const interval of merged) {
-    if (cursor < interval.start) available.push({ start: cursor, end: interval.start })
-    cursor = Math.max(cursor, interval.end)
+const excludeLunch = (intervals: TimeInterval[]): TimeInterval[] => intervals.flatMap((interval) => {
+  if (interval.end <= LUNCH_START || interval.start >= LUNCH_END) return [interval]
+
+  const result: TimeInterval[] = []
+  if (interval.start < LUNCH_START) result.push({ start: interval.start, end: LUNCH_START })
+  if (interval.end > LUNCH_END) result.push({ start: LUNCH_END, end: interval.end })
+  return result
+})
+
+/** Рассчитывает рабочее время с учётом обеда, пар и дороги. */
+export function getEmployeeAvailabilitySummary(lessons: Lesson[]): EmployeeAvailabilitySummary {
+  const lessonInterval = getLessonInterval(lessons)
+  const workIntervals = lessonInterval
+    ? [
+        { start: WORKDAY_START, end: Math.min(WORKDAY_END, lessonInterval.start - TRAVEL_TIME) },
+        { start: Math.max(WORKDAY_START, lessonInterval.end + TRAVEL_TIME), end: WORKDAY_END },
+      ]
+    : [{ start: WORKDAY_START, end: WORKDAY_END }]
+
+  return {
+    lessonInterval,
+    workIntervals: excludeLunch(workIntervals.filter((interval) => interval.end > interval.start)),
   }
-  if (cursor < WORKDAY_END) available.push({ start: cursor, end: WORKDAY_END })
-  return available
+}
+
+export function getAvailableWorkIntervals(lessons: Lesson[]): TimeInterval[] {
+  return getEmployeeAvailabilitySummary(lessons).workIntervals
 }
 
 export function formatAvailability(intervals: TimeInterval[]): string {
@@ -61,7 +84,30 @@ export function formatAvailability(intervals: TimeInterval[]): string {
     .join(' и ')
 }
 
-export function splitTelegramMessage(lines: string[], maxLength = 4096): string[] {
+export function formatLessonAvailability(interval: TimeInterval | null): string {
+  if (!interval) return 'нет пар'
+  return `с ${formatWorkTime(interval.start)} до ${formatWorkTime(interval.end)}`
+}
+
+const escapeHtml = (value: string) => value
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+
+export function formatEmployeeAvailabilityReport(input: {
+  fullName: string
+  groupName: string
+  lessons: Lesson[]
+}): string {
+  const summary = getEmployeeAvailabilitySummary(input.lessons)
+  return [
+    `<b>${escapeHtml(input.fullName)}</b> (${escapeHtml(input.groupName)}):`,
+    `  – <b>на работе:</b> ${formatAvailability(summary.workIntervals)}`,
+    `  – <b>на парах:</b> ${formatLessonAvailability(summary.lessonInterval)}`,
+  ].join('\n')
+}
+
+export function splitTelegramMessage(lines: string[], maxLength = 4096, separator = '\n'): string[] {
   const messages: string[] = []
   let current = ''
   for (const line of lines) {
@@ -69,8 +115,8 @@ export function splitTelegramMessage(lines: string[], maxLength = 4096): string[
       current = line
       continue
     }
-    if (current.length + line.length + 1 <= maxLength) {
-      current += `\n${line}`
+    if (current.length + line.length + separator.length <= maxLength) {
+      current += `${separator}${line}`
     } else {
       messages.push(current)
       current = line

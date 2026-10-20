@@ -17,8 +17,7 @@ import {
   listEnabledEmployeeAvailabilityConfigs,
 } from '@/lib/employee-availability-store'
 import {
-  formatAvailability,
-  getAvailableWorkIntervals,
+  formatEmployeeAvailabilityReport,
   splitTelegramMessage,
 } from '@/lib/employee-availability'
 
@@ -282,7 +281,11 @@ async function dispatchEmployeeAvailabilityReports(input: {
           input.now,
           input.scheduleCache
         )
-        return `${person.fullName} — ${formatAvailability(getAvailableWorkIntervals(schedule.lessons))}.`
+        return formatEmployeeAvailabilityReport({
+          fullName: person.fullName,
+          groupName: person.groupName,
+          lessons: schedule.lessons,
+        })
       }))
 
       const claimed = await claimNotificationDispatch({
@@ -296,8 +299,9 @@ async function dispatchEmployeeAvailabilityReports(input: {
         continue
       }
 
-      for (const message of splitTelegramMessage(lines)) {
+      for (const message of splitTelegramMessage(lines, 4096, '\n\n')) {
         await sendTelegramMessage(input.botToken, config.recipientId, message, {
+          parseMode: 'HTML',
           disableWebPagePreview: true,
           messageThreadId: config.topicId ?? undefined,
         })
