@@ -19,6 +19,7 @@ import {
 import {
   formatEmployeeAvailabilityReport,
   formatEmployeeAvailabilityReportTitle,
+  shouldIncludeEmployeeAvailabilityReport,
   splitTelegramMessage,
 } from '@/lib/employee-availability'
 
@@ -275,19 +276,25 @@ async function dispatchEmployeeAvailabilityReports(input: {
         continue
       }
 
-      const lines = await Promise.all(config.people.map(async (person) => {
+      const reportLines = await Promise.all(config.people.map(async (person) => {
         const schedule = await getScheduleForDate(
           person.facultySlug,
           person.groupSlug,
           input.now,
           input.scheduleCache
         )
+        if (!shouldIncludeEmployeeAvailabilityReport(schedule.lessons)) return null
         return formatEmployeeAvailabilityReport({
           fullName: person.fullName,
           groupName: person.groupName,
           lessons: schedule.lessons,
         })
       }))
+      const lines = reportLines.filter((line): line is string => line !== null)
+      if (lines.length === 0) {
+        skipped += 1
+        continue
+      }
 
       const claimed = await claimNotificationDispatch({
         recipientKind: config.recipientKind,

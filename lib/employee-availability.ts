@@ -79,6 +79,15 @@ export function getAvailableWorkIntervals(lessons: Lesson[]): TimeInterval[] {
   return getEmployeeAvailabilitySummary(lessons).workIntervals
 }
 
+export function shouldIncludeEmployeeAvailabilityReport(lessons: Lesson[]): boolean {
+  const activeLessons = lessons.filter((lesson) => !lesson.isCancelled)
+  if (activeLessons.length === 0) return true
+  return !activeLessons.every((lesson) => {
+    const start = parseTime(lesson.time)
+    return start !== null && start >= WORKDAY_END
+  })
+}
+
 export function formatAvailability(intervals: TimeInterval[]): string {
   if (intervals.length === 0) return 'Нет свободного времени'
   return intervals

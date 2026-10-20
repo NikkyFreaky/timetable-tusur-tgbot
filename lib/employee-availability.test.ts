@@ -6,6 +6,7 @@ import {
   formatLessonAvailability,
   getEmployeeAvailabilitySummary,
   getAvailableWorkIntervals,
+  shouldIncludeEmployeeAvailabilityReport,
   splitTelegramMessage,
 } from '@/lib/employee-availability'
 import type { Lesson } from '@/lib/schedule-types'
@@ -96,6 +97,28 @@ describe('formatEmployeeAvailabilityReport', () => {
   it('формирует заголовок с датой', () => {
     expect(formatEmployeeAvailabilityReportTitle(new Date(2026, 9, 20)))
       .toBe('<b>Сводка рабочего времени сотрудников на 20.10.2026:</b>')
+  })
+})
+
+describe('shouldIncludeEmployeeAvailabilityReport', () => {
+  it('исключает сотрудника только с парами после рабочего дня', () => {
+    expect(shouldIncludeEmployeeAvailabilityReport([
+      lesson('18:00', '19:30'),
+      lesson('19:40', '21:10'),
+    ])).toBe(false)
+  })
+
+  it('включает сотрудника после изменения расписания', () => {
+    expect(shouldIncludeEmployeeAvailabilityReport([
+      lesson('16:45', '18:20'),
+      lesson('19:40', '21:10'),
+    ])).toBe(true)
+  })
+
+  it('включает сотрудника без активных пар', () => {
+    expect(shouldIncludeEmployeeAvailabilityReport([
+      lesson('18:00', '19:30', true),
+    ])).toBe(true)
   })
 })
 
