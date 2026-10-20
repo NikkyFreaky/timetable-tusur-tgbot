@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
-import { ChevronRight, Clock, GripVertical, Plus, Trash2, Users } from 'lucide-react'
+import { ChevronRight, Clock, GripVertical, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { GroupSearchDrawer } from '@/components/schedule/group-search-drawer'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -13,7 +13,9 @@ import type { ChatTopic } from '@/lib/schedule-types'
 interface EmployeeAvailabilityPerson {
   id: string
   fullName: string
+  facultySlug: string
   facultyName: string
+  groupSlug: string
   groupName: string
   course: number
   sortOrder: number
@@ -23,6 +25,10 @@ interface EmployeeAvailabilityConfig {
   id: string
   enabled: boolean
   notificationTime: string
+  workdayStart: string
+  workdayEnd: string
+  lunchStart: string
+  lunchEnd: string
   topicId: number | null
   people: EmployeeAvailabilityPerson[]
 }
@@ -32,11 +38,16 @@ interface EmployeeAvailabilitySettingsProps {
   chatId?: number
   isForum?: boolean
   topics?: ChatTopic[]
+  heading?: string
 }
 
 const EMPTY_CONFIG: Omit<EmployeeAvailabilityConfig, 'id' | 'people'> = {
   enabled: false,
-  notificationTime: '08:00',
+  notificationTime: '09:00',
+  workdayStart: '09:00',
+  workdayEnd: '18:00',
+  lunchStart: '13:00',
+  lunchEnd: '14:00',
   topicId: null,
 }
 
@@ -63,6 +74,7 @@ export function EmployeeAvailabilitySettings({
   chatId,
   isForum = false,
   topics = [],
+  heading = 'Сводка сотрудников',
 }: EmployeeAvailabilitySettingsProps) {
   const { hapticFeedback, webApp } = useTelegram()
   const [allowed, setAllowed] = useState<boolean | null>(null)
@@ -70,6 +82,12 @@ export function EmployeeAvailabilitySettings({
   const [fullName, setFullName] = useState('')
   const [group, setGroup] = useState<GroupSearchMatch | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [editingPerson, setEditingPerson] = useState<EmployeeAvailabilityPerson | null>(null)
+  const [editingFullName, setEditingFullName] = useState('')
+  const [editingGroup, setEditingGroup] = useState<GroupSearchMatch | null>(null)
+  const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [editGroupSearchOpen, setEditGroupSearchOpen] = useState(false)
+  const [editMessage, setEditMessage] = useState('')
   const [timePickerOpen, setTimePickerOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -120,6 +138,10 @@ export function EmployeeAvailabilitySettings({
         body: JSON.stringify({
           enabled: next.enabled,
           notificationTime: next.notificationTime,
+          workdayStart: next.workdayStart,
+          workdayEnd: next.workdayEnd,
+          lunchStart: next.lunchStart,
+          lunchEnd: next.lunchEnd,
           topicId: isForum ? next.topicId : null,
         }),
       })
@@ -193,6 +215,58 @@ export function EmployeeAvailabilitySettings({
       setConfig(data.config)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось удалить сотрудника')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openEditPerson = (person: EmployeeAvailabilityPerson) => {
+    setEditingPerson(person)
+    setEditingFullName(person.fullName)
+    setEditingGroup({
+      facultySlug: person.facultySlug,
+      facultyName: person.facultyName,
+      courseNumber: person.course,
+      groupSlug: person.groupSlug,
+      groupName: person.groupName,
+    })
+    setEditMessage('')
+    setEditSheetOpen(true)
+  }
+
+  const savePerson = async () => {
+    if (!editingPerson || !editingFullName.trim() || !editingGroup) {
+      setEditMessage('Укажите ФИО и выберите группу')
+      return
+    }
+
+    setSaving(true)
+    setEditMessage('')
+    try {
+      const response = await fetch(`/api/employee-availability${query}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          personId: editingPerson.id,
+          fullName: editingFullName.trim(),
+          facultySlug: editingGroup.facultySlug,
+          facultyName: editingGroup.facultyName,
+          groupSlug: editingGroup.groupSlug,
+          groupName: editingGroup.groupName,
+          course: editingGroup.courseNumber,
+        }),
+      })
+      const data = await response.json().catch(() => ({})) as {
+        config?: EmployeeAvailabilityConfig
+        error?: string
+      }
+      if (!response.ok || !data.config) throw new Error(data.error ?? 'Не удалось сохранить сотрудника')
+      setConfig(data.config)
+      setEditSheetOpen(false)
+      setEditingPerson(null)
+      hapticFeedback('success')
+    } catch (error) {
+      setEditMessage(error instanceof Error ? error.message : 'Не удалось сохранить сотрудника')
     } finally {
       setSaving(false)
     }
@@ -308,7 +382,7 @@ export function EmployeeAvailabilitySettings({
   return (
     <section className="px-4 mb-6">
       <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Сводка сотрудников
+        {heading}
       </h3>
       <div className="rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between p-4">
@@ -354,6 +428,55 @@ export function EmployeeAvailabilitySettings({
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </div>
           </button>
+
+          <div className="space-y-3 rounded-xl border border-border/60 bg-background/80 p-3">
+            <div>
+              <div className="text-sm font-medium text-foreground">Рабочее время</div>
+              <div className="text-xs text-muted-foreground">
+                Учитывается при расчёте свободного времени сотрудников
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Начало работы</span>
+                <Input
+                  type="time"
+                  value={values.workdayStart}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ workdayStart: event.target.value })}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Конец работы</span>
+                <Input
+                  type="time"
+                  value={values.workdayEnd}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ workdayEnd: event.target.value })}
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Начало обеда</span>
+                <Input
+                  type="time"
+                  value={values.lunchStart}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ lunchStart: event.target.value })}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Конец обеда</span>
+                <Input
+                  type="time"
+                  value={values.lunchEnd}
+                  disabled={saving}
+                  onChange={(event) => void saveConfig({ lunchEnd: event.target.value })}
+                />
+              </label>
+            </div>
+          </div>
 
           {chatId && isForum && (
             <label className="block space-y-1">
@@ -433,6 +556,15 @@ export function EmployeeAvailabilitySettings({
                   <button
                     type="button"
                     disabled={saving}
+                    onClick={() => openEditPerson(person)}
+                    className="rounded-md p-2 text-muted-foreground hover:text-foreground"
+                    aria-label={`Редактировать ${person.fullName}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving}
                     onClick={() => void removePerson(person.id)}
                     className="rounded-md p-2 text-muted-foreground hover:text-destructive"
                     aria-label={`Удалить ${person.fullName}`}
@@ -448,6 +580,67 @@ export function EmployeeAvailabilitySettings({
         )}
       </div>
       <GroupSearchDrawer open={searchOpen} onOpenChange={setSearchOpen} onSelectGroup={setGroup} />
+      <GroupSearchDrawer
+        open={editGroupSearchOpen}
+        onOpenChange={setEditGroupSearchOpen}
+        onSelectGroup={setEditingGroup}
+      />
+      <Sheet
+        open={editSheetOpen}
+        onOpenChange={(open) => {
+          setEditSheetOpen(open)
+          if (!open) setEditMessage('')
+        }}
+      >
+        <SheetContent side="bottom" className="rounded-t-3xl px-0">
+          <SheetHeader className="border-b border-border px-4 pb-4">
+            <SheetTitle className="mx-auto text-lg">Изменить сотрудника</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 px-4 py-4">
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">ФИО сотрудника</span>
+              <Input
+                value={editingFullName}
+                maxLength={200}
+                disabled={saving}
+                onChange={(event) => setEditingFullName(event.target.value)}
+              />
+            </label>
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Группа</span>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setEditGroupSearchOpen(true)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-left text-sm disabled:opacity-50"
+              >
+                {editingGroup
+                  ? `Группа ${editingGroup.groupName} · ${editingGroup.facultyName}`
+                  : 'Выбрать группу'}
+              </button>
+            </div>
+            {editMessage && <div className="text-sm text-destructive">{editMessage}</div>}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setEditSheetOpen(false)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void savePerson()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
       <Sheet open={timePickerOpen} onOpenChange={setTimePickerOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl px-0">
           <SheetHeader className="border-b border-border px-4 pb-4">

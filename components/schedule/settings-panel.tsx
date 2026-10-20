@@ -27,7 +27,7 @@ interface SettingsPanelProps {
 }
 
 type SettingsView = "main" | "faculty" | "course" | "group" | "time"
-type SettingsTab = "personal" | "groups"
+type SettingsTab = "personal" | "groups" | "employee-availability"
 
 const MASTER_GROUP_PATTERN = /(?:\u041C|\u043C|M|m)/
 const COURSE_BADGE_STYLES = [
@@ -354,7 +354,7 @@ export function SettingsPanel({
   }, [])
 
   useEffect(() => {
-    if (!open || activeTab !== "groups" || !userId) {
+    if (!open || (activeTab !== "groups" && activeTab !== "employee-availability") || !userId) {
       console.log("Skipping chat load:", { open, activeTab, userId })
       return
     }
@@ -902,6 +902,7 @@ export function SettingsPanel({
               <TabsList className="w-full mt-4">
                 <TabsTrigger value="personal">Личные</TabsTrigger>
                 <TabsTrigger value="groups">Групповые</TabsTrigger>
+                <TabsTrigger value="employee-availability">Сотрудники</TabsTrigger>
               </TabsList>
             </Tabs>
           )}
@@ -1105,8 +1106,6 @@ export function SettingsPanel({
                 </div>
               </div>
 
-              <EmployeeAvailabilitySettings userId={userId} />
-
               {/* Reset */}
               <div className="px-4">
                 <button
@@ -1236,13 +1235,6 @@ export function SettingsPanel({
                               </div>
                             </div>
                           )}
-
-                          <EmployeeAvailabilitySettings
-                            userId={userId}
-                            chatId={selectedChat.id}
-                            isForum={selectedChat.isForum}
-                            topics={topics}
-                          />
 
                           {/* Group Selection */}
                           <div className="px-4 mb-6">
@@ -1452,6 +1444,69 @@ export function SettingsPanel({
                             </div>
                           </div>
                         </>
+                      )}
+                    </>
+                  )}
+                </div>
+              </TabsContent>
+              <TabsContent value="employee-availability">
+                <div className="py-4">
+                  {!userId && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Настройки сводки доступны только через Telegram Mini App.
+                      Откройте приложение через бота @timetable_tusur_tg_bot.
+                    </div>
+                  )}
+
+                  {userId && (
+                    <EmployeeAvailabilitySettings
+                      userId={userId}
+                      heading="Личная сводка"
+                    />
+                  )}
+
+                  {userId && isLoadingChats && (
+                    <CenteredLoader label="Загрузка групп..." className="min-h-[180px]" />
+                  )}
+                  {userId && !isLoadingChats && chatsError && (
+                    <div className="px-4 py-8 text-center text-destructive">{chatsError}</div>
+                  )}
+                  {userId && !isLoadingChats && !chatsError && chats.length === 0 && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      Нет групп для настройки сводки
+                    </div>
+                  )}
+                  {userId && !isLoadingChats && !chatsError && chats.length > 0 && (
+                    <>
+                      <div className="px-4 mb-6">
+                        <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Группа для сводки
+                        </h3>
+                        <div className="relative">
+                          <select
+                            value={selectedChatId || ""}
+                            onChange={(event) => event.target.value && handleChatSelect(Number(event.target.value))}
+                            className="w-full appearance-none rounded-xl border border-border bg-card p-4 text-foreground"
+                          >
+                            <option value="" disabled>Выберите группу</option>
+                            {chats.map((chat) => (
+                              <option key={chat.id} value={chat.id}>
+                                {chat.title || "Без названия"}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                        </div>
+                      </div>
+
+                      {selectedChat && (
+                        <EmployeeAvailabilitySettings
+                          userId={userId}
+                          chatId={selectedChat.id}
+                          isForum={selectedChat.isForum}
+                          topics={topics}
+                          heading="Сводка для группы"
+                        />
                       )}
                     </>
                   )}

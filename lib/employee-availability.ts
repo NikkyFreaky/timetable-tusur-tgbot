@@ -1,10 +1,20 @@
 import type { Lesson } from '@/lib/schedule-types'
 
-export const WORKDAY_START = 9 * 60
-export const WORKDAY_END = 18 * 60
-export const LUNCH_START = 13 * 60
-export const LUNCH_END = 14 * 60
 export const TRAVEL_TIME = 20
+
+export interface EmployeeAvailabilityWorkSchedule {
+  workdayStart: string
+  workdayEnd: string
+  lunchStart: string
+  lunchEnd: string
+}
+
+export const DEFAULT_EMPLOYEE_AVAILABILITY_WORK_SCHEDULE: EmployeeAvailabilityWorkSchedule = {
+  workdayStart: '09:00',
+  workdayEnd: '18:00',
+  lunchStart: '13:00',
+  lunchEnd: '14:00',
+}
 
 export interface TimeInterval {
   start: number
@@ -29,14 +39,33 @@ export interface EmployeeAvailabilitySummary {
   lessonInterval: TimeInterval | null
 }
 
-const getLessonInterval = (lessons: Lesson[]): TimeInterval | null => {
+interface WorkScheduleMinutes {
+  workdayStart: number
+  workdayEnd: number
+  lunchStart: number
+  lunchEnd: number
+}
+
+const getWorkScheduleMinutes = (
+  schedule: EmployeeAvailabilityWorkSchedule
+): WorkScheduleMinutes => ({
+  workdayStart: parseTime(schedule.workdayStart) ?? 9 * 60,
+  workdayEnd: parseTime(schedule.workdayEnd) ?? 18 * 60,
+  lunchStart: parseTime(schedule.lunchStart) ?? 13 * 60,
+  lunchEnd: parseTime(schedule.lunchEnd) ?? 14 * 60,
+})
+
+const getLessonInterval = (
+  lessons: Lesson[],
+  schedule: WorkScheduleMinutes
+): TimeInterval | null => {
   const intervals = lessons
     .filter((lesson) => !lesson.isCancelled)
     .map((lesson) => {
       const start = parseTime(lesson.time)
       const end = parseTime(lesson.timeEnd)
-      if (start === null || end === null || end <= start || start >= WORKDAY_END) return null
-      return { start: Math.max(start, WORKDAY_START), end }
+      if (start === null || end === null || end <= start || start >= schedule.workdayEnd) return null
+      return { start: Math.max(start, schedule.workdayStart), end }
     })
     .filter((interval): interval is TimeInterval => Boolean(interval && interval.end > interval.start))
     .sort((left, right) => left.start - right.start)
@@ -48,44 +77,64 @@ const getLessonInterval = (lessons: Lesson[]): TimeInterval | null => {
   }
 }
 
-const excludeLunch = (intervals: TimeInterval[]): TimeInterval[] => intervals.flatMap((interval) => {
-  if (interval.end <= LUNCH_START || interval.start >= LUNCH_END) return [interval]
+const excludeLunch = (
+  intervals: TimeInterval[],
+  schedule: WorkScheduleMinutes
+): TimeInterval[] => intervals.flatMap((interval) => {
+  if (interval.end <= schedule.lunchStart || interval.start >= schedule.lunchEnd) return [interval]
 
   const result: TimeInterval[] = []
-  if (interval.start < LUNCH_START) result.push({ start: interval.start, end: LUNCH_START })
-  if (interval.end > LUNCH_END) result.push({ start: LUNCH_END, end: interval.end })
+  if (interval.start < schedule.lunchStart) result.push({ start: interval.start, end: schedule.lunchStart })
+  if (interval.end > schedule.lunchEnd) result.push({ start: schedule.lunchEnd, end: interval.end })
   return result
 })
 
 /** Рассчитывает рабочее время с учётом обеда, пар и дороги. */
-export function getEmployeeAvailabilitySummary(lessons: Lesson[]): EmployeeAvailabilitySummary {
-  const lessonInterval = getLessonInterval(lessons)
+export function getEmployeeAvailabilitySummary(
+  lessons: Lesson[],
+  workSchedule = DEFAULT_EMPLOYEE_AVAILABILITY_WORK_SCHEDULE
+): EmployeeAvailabilitySummary {
+  const schedule = getWorkScheduleMinutes(workSchedule)
+  const lessonInterval = getLessonInterval(lessons, schedule)
   const workIntervals = lessonInterval
     ? [
-        { start: WORKDAY_START, end: Math.min(WORKDAY_END, lessonInterval.start - TRAVEL_TIME) },
-        { start: Math.max(WORKDAY_START, lessonInterval.end + TRAVEL_TIME), end: WORKDAY_END },
+        {
+          start: schedule.workdayStart,
+          end: Math.min(schedule.workdayEnd, lessonInterval.start - TRAVEL_TIME),
+        },
+        {
+          start: Math.max(schedule.workdayStart, lessonInterval.end + TRAVEL_TIME),
+          end: schedule.workdayEnd,
+        },
       ]
-    : [{ start: WORKDAY_START, end: WORKDAY_END }]
+    : [{ start: schedule.workdayStart, end: schedule.workdayEnd }]
 
   return {
     lessonInterval,
     workIntervals: lessonInterval
-      ? excludeLunch(workIntervals.filter((interval) => interval.end > interval.start))
+      ? excludeLunch(workIntervals.filter((interval) => interval.end > interval.start), schedule)
       : workIntervals,
   }
 }
 
-export function getAvailableWorkIntervals(lessons: Lesson[]): TimeInterval[] {
-  return getEmployeeAvailabilitySummary(lessons).workIntervals
+export function getAvailableWorkIntervals(
+  lessons: Lesson[],
+  workSchedule = DEFAULT_EMPLOYEE_AVAILABILITY_WORK_SCHEDULE
+): TimeInterval[] {
+  return getEmployeeAvailabilitySummary(lessons, workSchedule).workIntervals
 }
 
-export function shouldIncludeEmployeeAvailabilityReport(lessons: Lesson[]): boolean {
+export function shouldIncludeEmployeeAvailabilityReport(
+  lessons: Lesson[],
+  workSchedule = DEFAULT_EMPLOYEE_AVAILABILITY_WORK_SCHEDULE
+): boolean {
+  const schedule = getWorkScheduleMinutes(workSchedule)
   return lessons.some((lesson) => {
     if (lesson.isCancelled) return false
     const start = parseTime(lesson.time)
     const end = parseTime(lesson.timeEnd)
     return start !== null && end !== null && end > start
-      && start < WORKDAY_END && end > WORKDAY_START
+      && start < schedule.workdayEnd && end > schedule.workdayStart
   })
 }
 
@@ -122,8 +171,9 @@ export function formatEmployeeAvailabilityReport(input: {
   groupName: string
   timetableUrl: string
   lessons: Lesson[]
+  workSchedule?: EmployeeAvailabilityWorkSchedule
 }): string {
-  const summary = getEmployeeAvailabilitySummary(input.lessons)
+  const summary = getEmployeeAvailabilitySummary(input.lessons, input.workSchedule)
   const groupLink = `<a href="${escapeHtmlAttribute(input.timetableUrl)}">${escapeHtml(input.groupName)}</a>`
   const lines = [
     `<b>• ${escapeHtml(input.fullName)} (${groupLink}):</b>`,

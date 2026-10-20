@@ -290,12 +290,13 @@ async function dispatchEmployeeAvailabilityReports(input: {
             getMondayOfWeek(input.now)
           ),
         ])
-        if (!shouldIncludeEmployeeAvailabilityReport(schedule.lessons)) return null
+        if (!shouldIncludeEmployeeAvailabilityReport(schedule.lessons, config)) return null
         return formatEmployeeAvailabilityReport({
           fullName: person.fullName,
           groupName: person.groupName,
           timetableUrl,
           lessons: schedule.lessons,
+          workSchedule: config,
         })
       }))
       const lines = reportLines.filter((line): line is string => line !== null)
