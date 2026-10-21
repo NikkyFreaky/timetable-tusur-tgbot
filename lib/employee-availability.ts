@@ -1,6 +1,7 @@
 import type { Lesson } from '@/lib/schedule-types'
 
 export const TRAVEL_TIME = 20
+const MIN_WORK_INTERVAL = 30
 
 export interface EmployeeAvailabilityWorkSchedule {
   workdayStart: string
@@ -51,11 +52,10 @@ const getWorkScheduleMinutes = (
   workdayEnd: parseTime(schedule.workdayEnd) ?? 18 * 60,
 })
 
-const getLessonInterval = (
+const getLessonIntervals = (
   lessons: Lesson[],
   schedule: WorkScheduleMinutes
-): TimeInterval | null => {
-  const intervals = lessons
+): TimeInterval[] => lessons
     .filter((lesson) => !lesson.isCancelled)
     .map((lesson) => {
       const start = parseTime(lesson.time)
@@ -66,11 +66,37 @@ const getLessonInterval = (
     .filter((interval): interval is TimeInterval => Boolean(interval && interval.end > interval.start))
     .sort((left, right) => left.start - right.start)
 
+const getLessonInterval = (intervals: TimeInterval[]): TimeInterval | null => {
   if (intervals.length === 0) return null
   return {
     start: intervals[0].start,
     end: Math.max(...intervals.map((interval) => interval.end)),
   }
+}
+
+const getWorkIntervals = (
+  lessonIntervals: TimeInterval[],
+  schedule: WorkScheduleMinutes
+): TimeInterval[] => {
+  const blockedIntervals = lessonIntervals
+    .map((interval) => ({
+      start: Math.max(schedule.workdayStart, interval.start - TRAVEL_TIME),
+      end: Math.min(schedule.workdayEnd, interval.end + TRAVEL_TIME),
+    }))
+    .sort((left, right) => left.start - right.start)
+
+  const intervals: TimeInterval[] = []
+  let cursor = schedule.workdayStart
+  for (const blocked of blockedIntervals) {
+    if (blocked.start > cursor && blocked.start - cursor >= MIN_WORK_INTERVAL) {
+      intervals.push({ start: cursor, end: blocked.start })
+    }
+    cursor = Math.max(cursor, blocked.end)
+  }
+  if (schedule.workdayEnd - cursor >= MIN_WORK_INTERVAL) {
+    intervals.push({ start: cursor, end: schedule.workdayEnd })
+  }
+  return intervals
 }
 
 /** Рассчитывает рабочее время с учётом пар и дороги. */
@@ -79,23 +105,15 @@ export function getEmployeeAvailabilitySummary(
   workSchedule = DEFAULT_EMPLOYEE_AVAILABILITY_WORK_SCHEDULE
 ): EmployeeAvailabilitySummary {
   const schedule = getWorkScheduleMinutes(workSchedule)
-  const lessonInterval = getLessonInterval(lessons, schedule)
+  const lessonIntervals = getLessonIntervals(lessons, schedule)
+  const lessonInterval = getLessonInterval(lessonIntervals)
   const workIntervals = lessonInterval
-    ? [
-        {
-          start: schedule.workdayStart,
-          end: Math.min(schedule.workdayEnd, lessonInterval.start - TRAVEL_TIME),
-        },
-        {
-          start: Math.max(schedule.workdayStart, lessonInterval.end + TRAVEL_TIME),
-          end: schedule.workdayEnd,
-        },
-      ]
+    ? getWorkIntervals(lessonIntervals, schedule)
     : [{ start: schedule.workdayStart, end: schedule.workdayEnd }]
 
   return {
     lessonInterval,
-    workIntervals: workIntervals.filter((interval) => interval.end > interval.start),
+    workIntervals,
   }
 }
 

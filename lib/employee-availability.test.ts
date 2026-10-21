@@ -27,7 +27,7 @@ describe('getAvailableWorkIntervals', () => {
     expect(getAvailableWorkIntervals([])).toEqual([{ start: 540, end: 1080 }])
   })
 
-  it('не считает перерывы между парами рабочим временем', () => {
+  it('не считает короткие перерывы между парами рабочим временем', () => {
     const summary = getEmployeeAvailabilitySummary([
       lesson('10:40', '12:15'),
       lesson('12:15', '13:50'),
@@ -37,6 +37,17 @@ describe('getAvailableWorkIntervals', () => {
 
     expect(formatAvailability(summary.workIntervals)).toBe('с 09:00 до 10:20')
     expect(formatLessonAvailability(summary.lessonInterval)).toBe('с 10:40 до 18:20')
+  })
+
+  it('учитывает длинный перерыв между парами с запасом на дорогу', () => {
+    const summary = getEmployeeAvailabilitySummary([
+      lesson('13:15', '15:00'),
+      lesson('16:45', '18:20'),
+    ])
+
+    expect(formatAvailability(summary.workIntervals))
+      .toBe('с 09:00 до 12:55 и с 15:20 до 16:25')
+    expect(formatLessonAvailability(summary.lessonInterval)).toBe('с 13:15 до 18:20')
   })
 
   it('учитывает дорогу после последней пары', () => {
