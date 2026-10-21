@@ -11,6 +11,7 @@ import {
 import { getChatById, getChatMemberRole, listChatTopics } from '@/lib/chat-store'
 import { isAdmin } from '@/lib/telegram-api'
 import { requireTelegramInitData } from '@/lib/telegram-auth'
+import type { EmployeeAttendanceType } from '@/lib/employee-availability-store'
 
 export const runtime = 'nodejs'
 
@@ -51,6 +52,10 @@ const isTargetResponse = (value: Target | NextResponse): value is NextResponse =
 
 function isTime(value: unknown): value is string {
   return typeof value === 'string' && /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(value)
+}
+
+function isEmployeeAttendanceType(value: unknown): value is EmployeeAttendanceType {
+  return value === 'gpo' || value === 'upd'
 }
 
 export async function GET(request: Request) {
@@ -146,7 +151,8 @@ export async function POST(request: Request) {
     const groupSlug = typeof body?.groupSlug === 'string' ? body.groupSlug : ''
     const groupName = typeof body?.groupName === 'string' ? body.groupName : ''
     const course = Number(body?.course)
-    if (!fullName || fullName.length > 200 || !facultySlug || !facultyName || !groupSlug || !groupName || !Number.isInteger(course) || course <= 0) {
+    const attendanceType = body?.attendanceType ?? 'gpo'
+    if (!fullName || fullName.length > 200 || !facultySlug || !facultyName || !groupSlug || !groupName || !Number.isInteger(course) || course <= 0 || !isEmployeeAttendanceType(attendanceType)) {
       return NextResponse.json({ error: 'Укажите ФИО и группу сотрудника' }, { status: 400 })
     }
 
@@ -158,6 +164,7 @@ export async function POST(request: Request) {
       groupSlug,
       groupName,
       course,
+      attendanceType,
       sortOrder: Math.max(-1, ...config.people.map((person) => person.sortOrder)) + 1,
     })
     return NextResponse.json({ config: await getEmployeeAvailabilityConfig(target.kind, target.id) })
@@ -187,7 +194,8 @@ export async function PATCH(request: Request) {
       const groupSlug = typeof body?.groupSlug === 'string' ? body.groupSlug : ''
       const groupName = typeof body?.groupName === 'string' ? body.groupName : ''
       const course = Number(body?.course)
-      if (!fullName || fullName.length > 200 || !facultySlug || !facultyName || !groupSlug || !groupName || !Number.isInteger(course) || course <= 0) {
+      const attendanceType = body?.attendanceType
+      if (!fullName || fullName.length > 200 || !facultySlug || !facultyName || !groupSlug || !groupName || !Number.isInteger(course) || course <= 0 || !isEmployeeAttendanceType(attendanceType)) {
         return NextResponse.json({ error: 'Укажите ФИО и группу сотрудника' }, { status: 400 })
       }
 
@@ -200,6 +208,7 @@ export async function PATCH(request: Request) {
         groupSlug,
         groupName,
         course,
+        attendanceType,
       })
       return NextResponse.json({ config: await getEmployeeAvailabilityConfig(target.kind, target.id) })
     }
