@@ -398,6 +398,7 @@ export type Database = {
       }
       employee_availability_people: {
         Row: {
+          attendance_type: string
           config_id: string
           course: number
           created_at: string
@@ -410,6 +411,7 @@ export type Database = {
           sort_order: number
         }
         Insert: {
+          attendance_type?: string
           config_id: string
           course: number
           created_at?: string
@@ -422,6 +424,7 @@ export type Database = {
           sort_order?: number
         }
         Update: {
+          attendance_type?: string
           config_id?: string
           course?: number
           created_at?: string
