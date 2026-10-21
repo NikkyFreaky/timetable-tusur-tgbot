@@ -18,6 +18,7 @@ interface EmployeeAvailabilityPerson {
   groupSlug: string
   groupName: string
   course: number
+  attendanceType: 'gpo' | 'upd'
   sortOrder: number
 }
 
@@ -54,6 +55,7 @@ const EMPTY_CONFIG: Omit<EmployeeAvailabilityConfig, 'id' | 'people'> = {
 const WHEEL_ITEM_HEIGHT = 44
 const WHEEL_VISIBLE_ITEMS = 5
 const WHEEL_CONTAINER_HEIGHT = WHEEL_ITEM_HEIGHT * WHEEL_VISIBLE_ITEMS
+const ATTENDANCE_TYPE_LABELS = { gpo: 'ГПО', upd: 'УПД' } as const
 
 const parseNotificationTime = (value: string) => {
   const [hourRaw, minuteRaw] = value.split(':')
@@ -81,10 +83,12 @@ export function EmployeeAvailabilitySettings({
   const [config, setConfig] = useState<EmployeeAvailabilityConfig | null>(null)
   const [fullName, setFullName] = useState('')
   const [group, setGroup] = useState<GroupSearchMatch | null>(null)
+  const [attendanceType, setAttendanceType] = useState<'gpo' | 'upd'>('gpo')
   const [searchOpen, setSearchOpen] = useState(false)
   const [editingPerson, setEditingPerson] = useState<EmployeeAvailabilityPerson | null>(null)
   const [editingFullName, setEditingFullName] = useState('')
   const [editingGroup, setEditingGroup] = useState<GroupSearchMatch | null>(null)
+  const [editingAttendanceType, setEditingAttendanceType] = useState<'gpo' | 'upd'>('gpo')
   const [editSheetOpen, setEditSheetOpen] = useState(false)
   const [editGroupSearchOpen, setEditGroupSearchOpen] = useState(false)
   const [editMessage, setEditMessage] = useState('')
@@ -181,6 +185,7 @@ export function EmployeeAvailabilitySettings({
           groupSlug: group.groupSlug,
           groupName: group.groupName,
           course: group.courseNumber,
+          attendanceType,
         }),
       })
       const data = await response.json().catch(() => ({})) as {
@@ -191,6 +196,7 @@ export function EmployeeAvailabilitySettings({
       setConfig(data.config)
       setFullName('')
       setGroup(null)
+      setAttendanceType('gpo')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось добавить сотрудника')
     } finally {
@@ -230,6 +236,7 @@ export function EmployeeAvailabilitySettings({
       groupSlug: person.groupSlug,
       groupName: person.groupName,
     })
+    setEditingAttendanceType(person.attendanceType)
     setEditMessage('')
     setEditSheetOpen(true)
   }
@@ -254,6 +261,7 @@ export function EmployeeAvailabilitySettings({
           groupSlug: editingGroup.groupSlug,
           groupName: editingGroup.groupName,
           course: editingGroup.courseNumber,
+          attendanceType: editingAttendanceType,
         }),
       })
       const data = await response.json().catch(() => ({})) as {
@@ -512,6 +520,18 @@ export function EmployeeAvailabilitySettings({
             >
               {group ? `Группа ${group.groupName} · ${group.facultyName}` : 'Выбрать группу'}
             </button>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Посещает</span>
+              <select
+                value={attendanceType}
+                disabled={saving}
+                onChange={(event) => setAttendanceType(event.target.value as 'gpo' | 'upd')}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              >
+                <option value="gpo">ГПО</option>
+                <option value="upd">УПД</option>
+              </select>
+            </label>
             <button
               type="button"
               disabled={saving}
@@ -550,7 +570,7 @@ export function EmployeeAvailabilitySettings({
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{person.fullName}</div>
                     <div className="truncate text-xs text-muted-foreground">
-                      Группа {person.groupName}, {person.facultyName}
+                      Группа {person.groupName}, {person.facultyName} · {ATTENDANCE_TYPE_LABELS[person.attendanceType]}
                     </div>
                   </div>
                   <button
@@ -619,6 +639,18 @@ export function EmployeeAvailabilitySettings({
                   : 'Выбрать группу'}
               </button>
             </div>
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">Посещает</span>
+              <select
+                value={editingAttendanceType}
+                disabled={saving}
+                onChange={(event) => setEditingAttendanceType(event.target.value as 'gpo' | 'upd')}
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              >
+                <option value="gpo">ГПО</option>
+                <option value="upd">УПД</option>
+              </select>
+            </label>
             {editMessage && <div className="text-sm text-destructive">{editMessage}</div>}
             <div className="flex justify-end gap-2 pt-2">
               <button
