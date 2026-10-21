@@ -2,6 +2,7 @@ import type { Lesson } from '@/lib/schedule-types'
 
 export const TRAVEL_TIME = 20
 const MIN_WORK_INTERVAL = 30
+export type EmployeeAttendanceType = 'gpo' | 'upd'
 
 export interface EmployeeAvailabilityWorkSchedule {
   workdayStart: string
@@ -27,6 +28,20 @@ const parseTime = (value: string): number | null => {
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
   return hours * 60 + minutes
+}
+
+/** Исключает из расписания предмет по альтернативному выбору сотрудника. */
+export function filterLessonsByAttendanceType(
+  lessons: Lesson[],
+  attendanceType: EmployeeAttendanceType
+): Lesson[] {
+  return lessons.filter((lesson) => {
+    const subject = lesson.subject.toLocaleUpperCase('ru-RU')
+    const hasUpd = subject.includes('УПД')
+    const hasGpo = subject.includes('ГПО')
+    if (hasUpd === hasGpo) return true
+    return attendanceType === 'gpo' ? !hasUpd : !hasGpo
+  })
 }
 
 export const formatWorkTime = (value: number): string => {

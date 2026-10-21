@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/database.types'
+import type { EmployeeAttendanceType } from '@/lib/employee-availability'
 
 export type EmployeeAvailabilityRecipientKind = 'user' | 'chat'
+export type { EmployeeAttendanceType } from '@/lib/employee-availability'
 
 export interface EmployeeAvailabilityPerson {
   id: string
@@ -11,6 +13,7 @@ export interface EmployeeAvailabilityPerson {
   groupSlug: string
   groupName: string
   course: number
+  attendanceType: EmployeeAttendanceType
   sortOrder: number
 }
 
@@ -47,6 +50,7 @@ type ConfigRow = {
     group_slug: string
     group_name: string
     course: number
+    attendance_type: EmployeeAttendanceType
     sort_order: number
   }>
 }
@@ -78,6 +82,7 @@ function mapConfig(row: ConfigRow): EmployeeAvailabilityConfig {
       groupSlug: person.group_slug,
       groupName: person.group_name,
       course: person.course,
+      attendanceType: person.attendance_type,
       sortOrder: person.sort_order,
     })).sort((left, right) => left.sortOrder - right.sortOrder),
   }
@@ -189,6 +194,7 @@ export async function addEmployeeAvailabilityPerson(input: {
   groupSlug: string
   groupName: string
   course: number
+  attendanceType: EmployeeAttendanceType
   sortOrder: number
 }) {
   const supabase = getServiceClient()
@@ -200,6 +206,7 @@ export async function addEmployeeAvailabilityPerson(input: {
     group_slug: input.groupSlug,
     group_name: input.groupName,
     course: input.course,
+    attendance_type: input.attendanceType,
     sort_order: input.sortOrder,
   })
 
@@ -215,6 +222,7 @@ export async function updateEmployeeAvailabilityPerson(input: {
   groupSlug: string
   groupName: string
   course: number
+  attendanceType: EmployeeAttendanceType
 }) {
   const supabase = getServiceClient()
   const { error } = await supabase
@@ -226,6 +234,7 @@ export async function updateEmployeeAvailabilityPerson(input: {
       group_slug: input.groupSlug,
       group_name: input.groupName,
       course: input.course,
+      attendance_type: input.attendanceType,
     })
     .eq('id', input.personId)
     .eq('config_id', input.configId)

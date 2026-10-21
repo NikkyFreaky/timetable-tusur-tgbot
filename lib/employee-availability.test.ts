@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  filterLessonsByAttendanceType,
   formatEmployeeAvailabilityReport,
   formatEmployeeAvailabilityReportTitle,
   formatAvailability,
@@ -11,15 +12,46 @@ import {
 } from '@/lib/employee-availability'
 import type { Lesson } from '@/lib/schedule-types'
 
-const lesson = (time: string, timeEnd: string, isCancelled = false): Lesson => ({
+const lesson = (
+  time: string,
+  timeEnd: string,
+  isCancelled = false,
+  subject = 'Тестовая пара'
+): Lesson => ({
   id: `${time}-${timeEnd}`,
   time,
   timeEnd,
-  subject: 'Тестовая пара',
+  subject,
   type: 'lecture',
   room: '—',
   instructor: '—',
   isCancelled,
+})
+
+describe('filterLessonsByAttendanceType', () => {
+  const electiveLessons = [
+    lesson('10:40', '12:15', false, 'УПДПД4'),
+    lesson('13:15', '14:50', false, 'ГПО'),
+    lesson('15:00', '16:35', false, 'Математика'),
+  ]
+
+  it('исключает УПД для сотрудника, посещающего ГПО', () => {
+    expect(filterLessonsByAttendanceType(electiveLessons, 'gpo').map((item) => item.subject))
+      .toEqual(['ГПО', 'Математика'])
+  })
+
+  it('исключает ГПО для сотрудника, посещающего УПД', () => {
+    expect(filterLessonsByAttendanceType(electiveLessons, 'upd').map((item) => item.subject))
+      .toEqual(['УПДПД4', 'Математика'])
+  })
+
+  it('исключает сотрудника из сводки, если остались только альтернативные пары', () => {
+    const lessons = filterLessonsByAttendanceType([
+      lesson('10:40', '12:15', false, 'УПД'),
+    ], 'gpo')
+
+    expect(shouldIncludeEmployeeAvailabilityReport(lessons)).toBe(false)
+  })
 })
 
 describe('getAvailableWorkIntervals', () => {

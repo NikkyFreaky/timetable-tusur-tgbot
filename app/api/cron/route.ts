@@ -17,6 +17,7 @@ import {
   listEnabledEmployeeAvailabilityConfigs,
 } from '@/lib/employee-availability-store'
 import {
+  filterLessonsByAttendanceType,
   formatEmployeeAvailabilityReport,
   formatEmployeeAvailabilityReportTitle,
   shouldIncludeEmployeeAvailabilityReport,
@@ -290,12 +291,13 @@ async function dispatchEmployeeAvailabilityReports(input: {
             getMondayOfWeek(input.now)
           ),
         ])
-        if (!shouldIncludeEmployeeAvailabilityReport(schedule.lessons, config)) return null
+        const lessons = filterLessonsByAttendanceType(schedule.lessons, person.attendanceType)
+        if (!shouldIncludeEmployeeAvailabilityReport(lessons, config)) return null
         return formatEmployeeAvailabilityReport({
           fullName: person.fullName,
           groupName: person.groupName,
           timetableUrl,
-          lessons: schedule.lessons,
+          lessons,
           workSchedule: config,
         })
       }))
