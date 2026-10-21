@@ -42,8 +42,6 @@ export interface EmployeeAvailabilitySummary {
 interface WorkScheduleMinutes {
   workdayStart: number
   workdayEnd: number
-  lunchStart: number
-  lunchEnd: number
 }
 
 const getWorkScheduleMinutes = (
@@ -51,8 +49,6 @@ const getWorkScheduleMinutes = (
 ): WorkScheduleMinutes => ({
   workdayStart: parseTime(schedule.workdayStart) ?? 9 * 60,
   workdayEnd: parseTime(schedule.workdayEnd) ?? 18 * 60,
-  lunchStart: parseTime(schedule.lunchStart) ?? 13 * 60,
-  lunchEnd: parseTime(schedule.lunchEnd) ?? 14 * 60,
 })
 
 const getLessonInterval = (
@@ -77,19 +73,7 @@ const getLessonInterval = (
   }
 }
 
-const excludeLunch = (
-  intervals: TimeInterval[],
-  schedule: WorkScheduleMinutes
-): TimeInterval[] => intervals.flatMap((interval) => {
-  if (interval.end <= schedule.lunchStart || interval.start >= schedule.lunchEnd) return [interval]
-
-  const result: TimeInterval[] = []
-  if (interval.start < schedule.lunchStart) result.push({ start: interval.start, end: schedule.lunchStart })
-  if (interval.end > schedule.lunchEnd) result.push({ start: schedule.lunchEnd, end: interval.end })
-  return result
-})
-
-/** Рассчитывает рабочее время с учётом обеда, пар и дороги. */
+/** Рассчитывает рабочее время с учётом пар и дороги. */
 export function getEmployeeAvailabilitySummary(
   lessons: Lesson[],
   workSchedule = DEFAULT_EMPLOYEE_AVAILABILITY_WORK_SCHEDULE
@@ -111,9 +95,7 @@ export function getEmployeeAvailabilitySummary(
 
   return {
     lessonInterval,
-    workIntervals: lessonInterval
-      ? excludeLunch(workIntervals.filter((interval) => interval.end > interval.start), schedule)
-      : workIntervals,
+    workIntervals: workIntervals.filter((interval) => interval.end > interval.start),
   }
 }
 
