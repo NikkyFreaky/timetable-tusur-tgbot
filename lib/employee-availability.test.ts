@@ -61,7 +61,7 @@ describe('getAvailableWorkIntervals', () => {
 
   it('не оставляет рабочее время после пары, пересекающей окончание дня', () => {
     const intervals = getAvailableWorkIntervals([lesson('17:20', '18:40')])
-    expect(formatAvailability(intervals)).toBe('с 09:00 до 13:00 и с 14:00 до 17:00')
+    expect(formatAvailability(intervals)).toBe('с 09:00 до 17:00')
   })
 
   it('сообщает о полной занятости', () => {
@@ -69,7 +69,7 @@ describe('getAvailableWorkIntervals', () => {
     expect(formatAvailability(intervals)).toBe('Нет свободного времени')
   })
 
-  it('использует настроенные рабочее время и обед', () => {
+  it('не разбивает рабочее время на обеденный перерыв', () => {
     const schedule = {
       workdayStart: '08:00',
       workdayEnd: '17:00',
@@ -78,7 +78,7 @@ describe('getAvailableWorkIntervals', () => {
     }
 
     expect(getAvailableWorkIntervals([lesson('10:00', '11:00')], schedule))
-      .toEqual([{ start: 480, end: 580 }, { start: 680, end: 720 }, { start: 750, end: 1020 }])
+      .toEqual([{ start: 480, end: 580 }, { start: 680, end: 1020 }])
     expect(shouldIncludeEmployeeAvailabilityReport([lesson('17:00', '18:00')], schedule)).toBe(false)
   })
 })
