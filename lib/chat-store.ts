@@ -1,12 +1,17 @@
+import 'server-only'
 import { createClient } from "@supabase/supabase-js"
 import type { UserSettings, ChatTopic } from "@/lib/schedule-types"
 import type { NotificationState } from "@/lib/notification-state"
 import type { Database, Json } from '@/lib/database.types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+if (!supabaseServiceRoleKey) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+}
+
+const supabase = createClient<Database>(supabaseUrl, supabaseServiceRoleKey)
 
 export type TelegramChatProfile = {
   id: number

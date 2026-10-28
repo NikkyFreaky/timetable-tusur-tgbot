@@ -13,8 +13,12 @@ export async function GET() {
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseServiceRoleKey) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+      return NextResponse.json({ error: 'Service misconfigured' }, { status: 503 })
+    }
+    const supabase = createClient<Database>(supabaseUrl, supabaseServiceRoleKey)
 
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
