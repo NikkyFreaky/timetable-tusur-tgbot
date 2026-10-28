@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type AdminProfile = {
   id: string
@@ -175,8 +176,8 @@ export default function AdminSettingsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-xl font-semibold text-foreground">Настройки</h1>
-        <div className="rounded-xl border border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-          Загрузка...
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-4" aria-label="Загрузка настроек" aria-busy="true">
+          {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-11 w-full" />)}
         </div>
       </div>
     )
@@ -186,7 +187,7 @@ export default function AdminSettingsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-xl font-semibold text-foreground">Настройки</h1>
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive" role="alert">
           {error || 'Не удалось загрузить профиль'}
         </div>
       </div>
@@ -227,7 +228,7 @@ export default function AdminSettingsPage() {
         <button
           type="submit"
           disabled={nameLoading}
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
           {nameLoading ? 'Сохранение...' : 'Сохранить имя'}
         </button>
@@ -273,7 +274,7 @@ export default function AdminSettingsPage() {
         <button
           type="submit"
           disabled={emailLoading}
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
           {emailLoading ? 'Сохранение...' : 'Обновить email'}
         </button>
@@ -339,7 +340,7 @@ export default function AdminSettingsPage() {
         <button
           type="submit"
           disabled={passwordLoading}
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
           {passwordLoading ? 'Сохранение...' : 'Обновить пароль'}
         </button>
@@ -352,7 +353,7 @@ function StatusMessage({ message }: { message: { type: 'success' | 'error'; text
   if (!message) return null
 
   return (
-    <div className={cn(
+    <div role="status" aria-live="polite" className={cn(
       'rounded-xl border p-3 text-sm',
       message.type === 'success'
         ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'

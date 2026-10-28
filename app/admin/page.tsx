@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type Stats = {
   totalUsers: number
@@ -61,8 +62,13 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6">
         <h1 className="text-xl font-semibold text-foreground">Дашборд</h1>
-        <div className="rounded-xl border border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-          Загрузка статистики...
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Загрузка статистики" aria-busy="true">
+          {Array.from({ length: 7 }, (_, index) => (
+            <div key={index} className="rounded-2xl border border-border bg-card p-4 space-y-3">
+              <Skeleton className="h-7 w-16" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -72,7 +78,7 @@ export default function AdminDashboard() {
     return (
       <div className="space-y-6">
         <h1 className="text-xl font-semibold text-foreground">Дашборд</h1>
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive" role="alert">
           {error || 'Не удалось загрузить статистику'}
         </div>
       </div>

@@ -1,6 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface AccessEntry {
   telegramUserId: number
@@ -13,7 +23,10 @@ export default function EmployeeAvailabilityAdminPage() {
   const [entries, setEntries] = useState<AccessEntry[]>([])
   const [telegramUserId, setTelegramUserId] = useState('')
   const [status, setStatus] = useState('')
+  const [formError, setFormError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [pendingRevoke, setPendingRevoke] = useState<AccessEntry | null>(null)
 
   const loadEntries = async () => {
     const response = await fetch('/api/admin/employee-availability/access')
@@ -30,26 +43,35 @@ export default function EmployeeAvailabilityAdminPage() {
 
   const saveAccess = async (id: number, isActive: boolean) => {
     setStatus('')
-    const response = await fetch('/api/admin/employee-availability/access', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramUserId: id, isActive }),
-    })
-    const data = await response.json().catch(() => ({})) as { error?: string }
-    if (!response.ok) {
-      setStatus(data.error ?? 'Не удалось обновить доступ')
-      return
+    setFormError('')
+    setSaving(true)
+    try {
+      const response = await fetch('/api/admin/employee-availability/access', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telegramUserId: id, isActive }),
+      })
+      const data = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) {
+        setStatus(data.error ?? 'Не удалось обновить доступ')
+        return
+      }
+      setTelegramUserId('')
+      setStatus(isActive ? 'Доступ выдан' : 'Доступ отозван')
+      await loadEntries()
+    } catch {
+      setStatus('Не удалось обновить доступ')
+    } finally {
+      setSaving(false)
+      setPendingRevoke(null)
     }
-    setTelegramUserId('')
-    setStatus(isActive ? 'Доступ выдан' : 'Доступ отозван')
-    await loadEntries()
   }
 
   const handleGrant = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const id = Number(telegramUserId)
     if (!Number.isSafeInteger(id) || id <= 0) {
-      setStatus('Укажите корректный Telegram ID')
+      setFormError('Укажите корректный Telegram ID')
       return
     }
     await saveAccess(id, true)
@@ -64,18 +86,26 @@ export default function EmployeeAvailabilityAdminPage() {
         </p>
       </div>
 
-      {status && <div className="rounded-xl border border-border bg-card p-3 text-sm">{status}</div>}
+      {status && <div className="rounded-xl border border-border bg-card p-3 text-sm" role="status" aria-live="polite">{status}</div>}
 
       <form onSubmit={handleGrant} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row">
-        <input
-          value={telegramUserId}
-          onChange={(event) => setTelegramUserId(event.target.value)}
-          inputMode="numeric"
-          placeholder="Telegram ID"
-          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
-        />
-        <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
-          Выдать доступ
+        <div className="min-w-0 flex-1 space-y-1">
+          <label htmlFor="telegram-user-id" className="text-xs font-medium text-muted-foreground">Telegram ID</label>
+          <input
+            id="telegram-user-id"
+            value={telegramUserId}
+            onChange={(event) => setTelegramUserId(event.target.value)}
+            inputMode="numeric"
+            aria-describedby="telegram-id-hint telegram-id-error"
+            aria-invalid={Boolean(formError)}
+            placeholder="Например, 123456789"
+            className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <p id="telegram-id-hint" className="text-xs text-muted-foreground">Числовой идентификатор пользователя Telegram.</p>
+          {formError && <p id="telegram-id-error" className="text-xs text-destructive" role="alert">{formError}</p>}
+        </div>
+        <button type="submit" disabled={saving} className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+          {saving ? 'Сохранение…' : 'Выдать доступ'}
         </button>
       </form>
 
@@ -88,17 +118,19 @@ export default function EmployeeAvailabilityAdminPage() {
         ) : (
           <div className="divide-y divide-border">
             {entries.map((entry) => (
-              <div key={entry.telegramUserId} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div key={entry.telegramUserId} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <div className="text-sm font-medium">{entry.telegramUserId}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <span className={entry.isActive ? 'mt-1 inline-flex rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-300' : 'mt-1 inline-flex rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground'}>
                     {entry.isActive ? 'Доступ активен' : 'Доступ отозван'}
-                  </div>
+                  </span>
+                  <div className="mt-1 text-xs text-muted-foreground">Выдан: {new Date(entry.createdAt).toLocaleString('ru-RU')} · Обновлён: {new Date(entry.updatedAt).toLocaleString('ru-RU')}</div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => saveAccess(entry.telegramUserId, !entry.isActive)}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium"
+                  onClick={() => entry.isActive ? setPendingRevoke(entry) : saveAccess(entry.telegramUserId, true)}
+                  disabled={saving}
+                  className="min-h-11 rounded-lg border border-border px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {entry.isActive ? 'Отозвать' : 'Выдать снова'}
                 </button>
@@ -107,6 +139,21 @@ export default function EmployeeAvailabilityAdminPage() {
           </div>
         )}
       </section>
+
+      <AlertDialog open={pendingRevoke !== null} onOpenChange={(open) => !open && !saving && setPendingRevoke(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Отозвать доступ?</AlertDialogTitle>
+            <AlertDialogDescription>Пользователь с Telegram ID {pendingRevoke?.telegramUserId} больше не сможет получать сводки.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Отмена</AlertDialogCancel>
+            <AlertDialogAction disabled={saving || !pendingRevoke} onClick={() => pendingRevoke && saveAccess(pendingRevoke.telegramUserId, false)} className="bg-destructive text-white hover:bg-destructive/90">
+              {saving ? 'Отзыв…' : 'Отозвать доступ'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type Admin = {
   id: string
@@ -159,8 +160,8 @@ export default function AdminsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-xl font-semibold text-foreground">Администраторы</h1>
-        <div className="rounded-xl border border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-          Загрузка...
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-4" aria-label="Загрузка администраторов" aria-busy="true">
+          {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-11 w-full" />)}
         </div>
       </div>
 
@@ -171,7 +172,7 @@ export default function AdminsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-xl font-semibold text-foreground">Администраторы</h1>
-        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive" role="alert">
           {error}
         </div>
       </div>
@@ -209,7 +210,7 @@ export default function AdminsPage() {
           </h2>
 
           {formError && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert">
               {formError}
             </div>
           )}
@@ -276,7 +277,7 @@ export default function AdminsPage() {
           <button
             type="submit"
             disabled={formLoading}
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             {formLoading ? 'Создание...' : 'Создать администратора'}
           </button>

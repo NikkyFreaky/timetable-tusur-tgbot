@@ -52,13 +52,13 @@ export function AdminNav({ email, displayName, role }: AdminNavProps) {
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex min-h-16 items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2 lg:gap-6">
+          <div className="flex min-w-0 items-center gap-2 xl:gap-6">
             <Sheet>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-11 lg:hidden"
+                  className="size-11 xl:hidden"
                   aria-label="Открыть навигацию"
                 >
                   <Menu className="size-5" />
@@ -100,7 +100,7 @@ export function AdminNav({ email, displayName, role }: AdminNavProps) {
             >
               Админ-панель
             </Link>
-            <nav className="hidden items-center gap-1 lg:flex" aria-label="Навигация админ-панели">
+            <nav className="hidden items-center gap-1 xl:flex" aria-label="Навигация админ-панели">
               {navItems.map((item) => {
                 const Icon = item.icon
 

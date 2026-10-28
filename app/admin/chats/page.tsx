@@ -62,6 +62,13 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
   )
 }
 
+const chatTypeLabels: Record<string, string> = {
+  private: 'Личный чат',
+  group: 'Группа',
+  supergroup: 'Супергруппа',
+  channel: 'Канал',
+}
+
 export default function AdminChatsPage() {
   const [data, setData] = useState<ChatsResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -143,10 +150,10 @@ export default function AdminChatsPage() {
         <StatCard label="Форумы" value={data.stats.forums} />
         <StatCard label="С настройками" value={data.stats.configured} />
         <StatCard label="Активны за 7 дней" value={data.stats.activeWeek} />
-        <StatCard label="Private" value={data.stats.byType.private} />
-        <StatCard label="Group" value={data.stats.byType.group} />
-        <StatCard label="Supergroup" value={data.stats.byType.supergroup} />
-        <StatCard label="Channel" value={data.stats.byType.channel} />
+        <StatCard label="Личные чаты" value={data.stats.byType.private} />
+        <StatCard label="Группы" value={data.stats.byType.group} />
+        <StatCard label="Супергруппы" value={data.stats.byType.supergroup} />
+        <StatCard label="Каналы" value={data.stats.byType.channel} />
       </div>
 
       <form
@@ -154,13 +161,16 @@ export default function AdminChatsPage() {
         className="rounded-2xl border border-border bg-card p-4 grid gap-3 md:grid-cols-[1fr_180px_auto_auto]"
       >
         <input
+          id="chat-search"
           type="text"
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
           placeholder="Поиск по названию, username или ID"
           className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
         />
+        <label htmlFor="chat-search" className="sr-only">Поиск чатов</label>
         <select
+          aria-label="Тип чата"
           value={typeFilter}
           onChange={(event) => {
             setPage(1)
@@ -169,10 +179,10 @@ export default function AdminChatsPage() {
           className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option value="">Все типы</option>
-          <option value="private">private</option>
-          <option value="group">group</option>
-          <option value="supergroup">supergroup</option>
-          <option value="channel">channel</option>
+          <option value="private">Личный чат</option>
+          <option value="group">Группа</option>
+          <option value="supergroup">Супергруппа</option>
+          <option value="channel">Канал</option>
         </select>
         <label className="inline-flex items-center gap-2 text-sm text-foreground px-2">
           <input
@@ -187,9 +197,16 @@ export default function AdminChatsPage() {
         </label>
         <button
           type="submit"
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+          className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Найти
+        </button>
+        <button
+          type="button"
+          onClick={() => { setQuery(''); setSearchInput(''); setTypeFilter(''); setForumsOnly(false); setPage(1) }}
+          className="min-h-11 rounded-xl border border-border px-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Сбросить
         </button>
       </form>
 
@@ -199,19 +216,19 @@ export default function AdminChatsPage() {
         ) : (
           <div className="divide-y divide-border">
             {data.chats.map((chat) => (
-              <div key={chat.id} className="px-4 py-3 space-y-1">
-                <div className="flex items-center justify-between gap-3">
+              <div key={chat.id} className="space-y-2 px-4 py-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-foreground truncate">
                         {chat.title || `Chat ${chat.id}`}
                       </span>
                       <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {chat.type}
+                        {chatTypeLabels[chat.type] ?? chat.type}
                       </span>
                       {chat.isForum && (
                         <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                          forum
+                          Форум
                         </span>
                       )}
                       {chat.hasSettings && (
@@ -227,7 +244,7 @@ export default function AdminChatsPage() {
                       {chat.group ? ` / ${chat.group}` : ''}
                     </div>
                   </div>
-                  <div className="text-right text-xs text-muted-foreground shrink-0">
+                  <div className="text-xs text-muted-foreground sm:shrink-0 sm:text-right">
                     <div>Последняя активность</div>
                     <div>{formatDateTime(chat.lastSeenAt)}</div>
                   </div>
@@ -247,7 +264,7 @@ export default function AdminChatsPage() {
             type="button"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page <= 1}
-            className="rounded-xl border border-border px-4 py-2 text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-h-11 rounded-xl border border-border px-4 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             Предыдущая
           </button>
@@ -258,7 +275,7 @@ export default function AdminChatsPage() {
             type="button"
             onClick={() => setPage((current) => Math.min(data.pagination.totalPages, current + 1))}
             disabled={page >= data.pagination.totalPages}
-            className="rounded-xl border border-border px-4 py-2 text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-h-11 rounded-xl border border-border px-4 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             Следующая
           </button>

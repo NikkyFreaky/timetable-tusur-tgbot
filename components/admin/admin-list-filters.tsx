@@ -204,15 +204,9 @@ export function ListFilters({
         </div>
         <div className="md:col-span-2 xl:col-span-5 flex flex-wrap gap-2">
           <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-          >
-            Применить
-          </button>
-          <button
             type="button"
             onClick={() => router.replace("/admin/users")}
-            className="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2 text-sm text-foreground transition hover:border-foreground/20"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-4 text-sm text-foreground transition hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Сбросить
           </button>
