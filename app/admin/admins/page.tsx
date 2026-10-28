@@ -1,6 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 type Admin = {
   id: string
@@ -33,6 +43,9 @@ export default function AdminsPage() {
   const [formRole, setFormRole] = useState<'admin' | 'superadmin'>('admin')
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [status, setStatus] = useState('')
+  const [pendingAction, setPendingAction] = useState<{ admin: Admin; type: 'delete' | 'role' } | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
   const isSuperadmin = currentRole === 'superadmin'
 
@@ -85,6 +98,7 @@ export default function AdminsPage() {
       setFormRole('admin')
       setShowForm(false)
       await loadAdmins()
+      setStatus('Администратор создан')
     } catch {
       setFormError('Произошла ошибка')
     } finally {
@@ -93,8 +107,7 @@ export default function AdminsPage() {
   }
 
   const handleDelete = async (admin: Admin) => {
-    if (!confirm(`Удалить администратора ${admin.email}?`)) return
-
+    setActionLoading(true)
     try {
       const res = await fetch(`/api/admin/admins/${admin.id}`, {
         method: 'DELETE',
@@ -102,20 +115,23 @@ export default function AdminsPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        alert(data.error || 'Ошибка удаления')
+        setStatus(data.error || 'Ошибка удаления')
         return
       }
 
       await loadAdmins()
+      setStatus('Администратор удалён')
     } catch {
-      alert('Произошла ошибка при удалении')
+      setStatus('Произошла ошибка при удалении')
+    } finally {
+      setActionLoading(false)
+      setPendingAction(null)
     }
   }
 
   const handleToggleRole = async (admin: Admin) => {
     const newRole = admin.role === 'superadmin' ? 'admin' : 'superadmin'
-    if (!confirm(`Изменить роль ${admin.email} на "${newRole === 'superadmin' ? 'Суперадмин' : 'Админ'}"?`)) return
-
+    setActionLoading(true)
     try {
       const res = await fetch(`/api/admin/admins/${admin.id}`, {
         method: 'PATCH',
@@ -125,13 +141,17 @@ export default function AdminsPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        alert(data.error || 'Ошибка обновления')
+        setStatus(data.error || 'Ошибка обновления')
         return
       }
 
       await loadAdmins()
+      setStatus('Роль администратора обновлена')
     } catch {
-      alert('Произошла ошибка при обновлении')
+      setStatus('Произошла ошибка при обновлении')
+    } finally {
+      setActionLoading(false)
+      setPendingAction(null)
     }
   }
 
@@ -143,6 +163,7 @@ export default function AdminsPage() {
           Загрузка...
         </div>
       </div>
+
     )
   }
 
@@ -165,12 +186,18 @@ export default function AdminsPage() {
           <button
             type="button"
             onClick={() => setShowForm(!showForm)}
-            className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+            className="min-h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {showForm ? 'Отмена' : 'Добавить'}
           </button>
         )}
       </div>
+
+      {status && (
+        <div className="rounded-xl border border-border bg-card p-3 text-sm" role="status" aria-live="polite">
+          {status}
+        </div>
+      )}
 
       {showForm && isSuperadmin && (
         <form
@@ -285,15 +312,17 @@ export default function AdminsPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => handleToggleRole(admin)}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition hover:text-foreground hover:border-foreground/20"
+                    onClick={() => setPendingAction({ admin, type: 'role' })}
+                    disabled={actionLoading}
+                    className="min-h-11 rounded-lg border border-border px-3 text-xs text-muted-foreground transition hover:text-foreground hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {admin.role === 'superadmin' ? 'Понизить' : 'Повысить'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(admin)}
-                    className="rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive transition hover:bg-destructive/5"
+                    onClick={() => setPendingAction({ admin, type: 'delete' })}
+                    disabled={actionLoading}
+                    className="min-h-11 rounded-lg border border-destructive/30 px-3 text-xs text-destructive transition hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Удалить
                   </button>
@@ -315,6 +344,29 @@ export default function AdminsPage() {
           Управление администраторами доступно только суперадминам.
         </div>
       )}
+
+      <AlertDialog open={pendingAction !== null} onOpenChange={(open) => !open && !actionLoading && setPendingAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pendingAction?.type === 'delete' ? 'Удалить администратора?' : 'Изменить роль?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.type === 'delete'
+                ? `Администратор ${pendingAction.admin.email} потеряет доступ к панели.`
+                : `Роль ${pendingAction?.admin.email} будет изменена на ${pendingAction?.admin.role === 'superadmin' ? 'Админ' : 'Суперадмин'}.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={actionLoading || !pendingAction}
+              onClick={() => pendingAction && (pendingAction.type === 'delete' ? handleDelete(pendingAction.admin) : handleToggleRole(pendingAction.admin))}
+              className={pendingAction?.type === 'delete' ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
+            >
+              {actionLoading ? 'Выполняется…' : 'Подтвердить'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
