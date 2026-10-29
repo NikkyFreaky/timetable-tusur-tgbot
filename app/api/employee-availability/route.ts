@@ -8,10 +8,10 @@ import {
   saveEmployeeAvailabilityConfig,
   updateEmployeeAvailabilityPerson,
 } from '@/lib/employee-availability-store'
-import { getChatById, getChatMemberRole, listChatTopics } from '@/lib/chat-store'
-import { isAdmin } from '@/lib/telegram-api'
-import { requireTelegramInitData } from '@/lib/telegram-auth'
+import { getChatById, listChatTopics } from '@/lib/chat-store'
+import { limitTelegramMutation, requireTelegramInitData } from '@/lib/telegram-auth'
 import type { EmployeeAttendanceType } from '@/lib/employee-availability-store'
+import { verifyChatAdmin } from '@/lib/chat-access'
 
 export const runtime = 'nodejs'
 
@@ -24,6 +24,8 @@ type Target = {
 async function getTarget(request: Request): Promise<Target | NextResponse> {
   const auth = requireTelegramInitData(request)
   if ('response' in auth) return auth.response
+  const rateLimit = limitTelegramMutation(request, auth.data.user.id)
+  if (rateLimit) return rateLimit
 
   if (!await hasEmployeeAvailabilityAccess(auth.data.user.id)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -38,12 +40,15 @@ async function getTarget(request: Request): Promise<Target | NextResponse> {
     return NextResponse.json({ error: 'Invalid chat id' }, { status: 400 })
   }
 
-  const [chat, role] = await Promise.all([
+  const [chat, access] = await Promise.all([
     getChatById(chatId),
-    getChatMemberRole(chatId, auth.data.user.id),
+    verifyChatAdmin(chatId, auth.data.user.id),
   ])
   if (!chat) return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
-  if (!role || !isAdmin(role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (access === 'unavailable') {
+    return NextResponse.json({ error: 'Unable to verify chat permissions' }, { status: 503 })
+  }
+  if (access !== 'authorized') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   return { kind: 'chat', id: chatId, isForum: chat.isForum }
 }

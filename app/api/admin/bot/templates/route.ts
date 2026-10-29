@@ -21,6 +21,9 @@ export async function GET() {
 export async function PUT(request: Request) {
   const adminUser = await getAdminUser()
   if (!adminUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (adminUser.admin.role !== 'superadmin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const body = await request.json().catch(() => null) as { templates?: BotMessageTemplate[] } | null
   if (!body?.templates || body.templates.length !== 6) {

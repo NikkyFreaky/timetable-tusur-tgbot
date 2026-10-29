@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { getChatById, getChatMemberRole } from "@/lib/chat-store"
+import { getChatById } from "@/lib/chat-store"
 import type { UserSettings } from "@/lib/schedule-types"
-import { isAdmin } from "@/lib/telegram-api"
-import { requireTelegramInitData } from "@/lib/telegram-auth"
+import { limitTelegramMutation, requireTelegramInitData } from "@/lib/telegram-auth"
+import { verifyChatAdmin } from '@/lib/chat-access'
 
 export const runtime = "nodejs"
 
@@ -19,6 +19,8 @@ export async function POST(
   try {
     const auth = requireTelegramInitData(request)
     if ('response' in auth) return auth.response
+    const rateLimit = limitTelegramMutation(request, auth.data.user.id)
+    if (rateLimit) return rateLimit
 
     const { id } = await context.params
     const chatId = Number(id)
@@ -32,8 +34,11 @@ export async function POST(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
-    const role = await getChatMemberRole(chatId, auth.data.user.id)
-    if (!role || !isAdmin(role)) {
+    const access = await verifyChatAdmin(chatId, auth.data.user.id)
+    if (access === 'unavailable') {
+      return NextResponse.json({ error: 'Unable to verify chat permissions' }, { status: 503 })
+    }
+    if (access !== 'authorized') {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

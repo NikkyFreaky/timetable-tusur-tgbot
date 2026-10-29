@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getChatById } from "@/lib/chat-store"
-import { getChatMemberRole } from "@/lib/chat-store"
 import { requireTelegramInitData } from "@/lib/telegram-auth"
+import { verifyChatMembership } from '@/lib/chat-access'
 
 export const runtime = "nodejs"
 
@@ -22,8 +22,11 @@ export async function GET(
       return NextResponse.json({ error: "Invalid chat id" }, { status: 400 })
     }
 
-    const role = await getChatMemberRole(chatId, auth.data.user.id)
-    if (!role || ['left', 'kicked'].includes(role)) {
+    const access = await verifyChatMembership(chatId, auth.data.user.id)
+    if (access === 'unavailable') {
+      return NextResponse.json({ error: 'Unable to verify chat permissions' }, { status: 503 })
+    }
+    if (access !== 'authorized') {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

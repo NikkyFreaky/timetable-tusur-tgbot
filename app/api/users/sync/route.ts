@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { upsertUser, type TelegramClientInfo, type TelegramUserProfile } from "@/lib/user-store"
 import type { UserSettings } from "@/lib/schedule-types"
-import { requireTelegramInitData } from "@/lib/telegram-auth"
+import { limitTelegramMutation, requireTelegramInitData } from "@/lib/telegram-auth"
 
 export const runtime = "nodejs"
 
@@ -14,6 +14,8 @@ export async function POST(request: Request) {
   try {
     const auth = requireTelegramInitData(request)
     if ('response' in auth) return auth.response
+    const rateLimit = limitTelegramMutation(request, auth.data.user.id)
+    if (rateLimit) return rateLimit
 
     const payload = (await request.json()) as SyncPayload
     const forwardedFor = request.headers.get("x-forwarded-for")

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
-import { getChatById, listChatTopics, getChatMemberRole, upsertChat } from "@/lib/chat-store"
-import { isAdmin, getChat } from "@/lib/telegram-api"
+import { getChatById, listChatTopics, upsertChat } from "@/lib/chat-store"
+import { getChat } from "@/lib/telegram-api"
 import { requireTelegramInitData } from "@/lib/telegram-auth"
+import { verifyChatAdmin } from '@/lib/chat-access'
 
 export const runtime = "nodejs"
 
@@ -18,7 +19,7 @@ export async function GET(
     const { id } = await context.params
     const chatId = Number(id)
 
-    console.log("=== GET /api/chats/[id]/topics ===", { chatId })
+    console.log('Loading chat topics')
 
     if (!Number.isFinite(chatId)) {
       return NextResponse.json({ error: "Invalid chat id" }, { status: 400 })
@@ -26,19 +27,15 @@ export async function GET(
 
     let chat = await getChatById(chatId)
     if (!chat) {
-      console.log("Chat not found:", chatId)
+      console.log('Chat not found')
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
-
-    console.log("Chat found:", { id: chat.id, title: chat.title, isForum: chat.isForum, topicId: chat.topicId })
 
     // Check and update is_forum via Telegram API if needed
     const botToken = process.env.BOT_TOKEN
     if (botToken && chatId < 0) { // Only for group chats (negative IDs)
       console.log("Fetching chat info from Telegram API...")
       const telegramChat = await getChat(botToken, chatId)
-      console.log("Telegram API chat info:", telegramChat)
-
       if (telegramChat) {
         const telegramIsForum = telegramChat.is_forum ?? false
         console.log("Telegram is_forum:", telegramIsForum, "DB isForum:", chat.isForum)
@@ -61,7 +58,7 @@ export async function GET(
           const updatedChat = await getChatById(chatId)
           if (updatedChat) {
             chat = updatedChat
-            console.log("Updated chat:", chat)
+            console.log('Forum status updated')
           }
         }
       }
@@ -71,12 +68,11 @@ export async function GET(
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
-    console.log("Checking user role:", { chatId, userId: auth.data.user.id })
-
-    const role = await getChatMemberRole(chatId, auth.data.user.id)
-    console.log("User role:", role)
-
-    if (!role || !isAdmin(role)) {
+    const access = await verifyChatAdmin(chatId, auth.data.user.id)
+    if (access === 'unavailable') {
+      return NextResponse.json({ error: 'Unable to verify chat permissions' }, { status: 503 })
+    }
+    if (access !== 'authorized') {
       console.log("Access denied: role is not admin")
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
@@ -98,8 +94,6 @@ export async function GET(
     console.log("Chat is a forum, loading topics from database")
 
     const topics = await listChatTopics(chatId)
-
-    console.log("Topics loaded from database:", topics)
 
     // For forums, the general topic is handled separately
     // Return the actual topics from the database

@@ -34,7 +34,7 @@ export async function sendTelegramMessage(
   if (options.replyMarkup) body.reply_markup = options.replyMarkup
   if (options.messageThreadId) body.message_thread_id = options.messageThreadId
 
-  console.log('[Telegram sendMessage] Request body:', JSON.stringify(body, null, 2))
+  console.log('[Telegram sendMessage] Sending message')
 
   const response = await fetch(`${TELEGRAM_API}${botToken}/sendMessage`, {
     method: "POST",
@@ -47,14 +47,13 @@ export async function sendTelegramMessage(
   if (!response.ok || !data.ok) {
     console.error('[Telegram sendMessage] Error:', {
       status: response.status,
-      data: data,
-      body: body
+      hasDescription: Boolean(data.description),
     })
     const description = data.description || `HTTP ${response.status}`
     throw new Error(`Telegram sendMessage failed: ${description}`)
   }
 
-  console.log('[Telegram sendMessage] Success')
+  console.log('[Telegram sendMessage] Sent successfully')
 }
 
 export function buildWebAppKeyboard(miniAppUrl: string) {

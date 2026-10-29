@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { fetchWeekSchedule } from "@/lib/timetable"
 import type { DaySchedule, SpecialPeriod } from "@/lib/schedule-types"
+import { checkRateLimit, getClientAddress } from '@/lib/rate-limit'
 
 type SchedulePayload = {
   weekType: "even" | "odd"
@@ -13,14 +14,17 @@ const inflightRequests = new Map<string, Promise<SchedulePayload>>()
 
 function parseDateParam(value: string | null): Date | null {
   if (!value) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
   const parts = value.split("-").map((part) => Number(part))
-  if (parts.length !== 3) return null
 
   const [year, month, day] = parts
   if (!year || !month || !day) return null
 
   const date = new Date(year, month - 1, day)
-  return Number.isNaN(date.getTime()) ? null : date
+  if (Number.isNaN(date.getTime())) return null
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+    ? date
+    : null
 }
 
 function getMondayOfWeek(date: Date): Date {
@@ -41,12 +45,23 @@ function formatDateParam(date: Date): string {
 
 export async function GET(request: Request) {
   try {
+    const rateLimit = checkRateLimit(`timetable:${getClientAddress(request)}`, {
+      limit: 60,
+      windowMs: 60_000,
+    })
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
+    }
     const { searchParams } = new URL(request.url)
     const faculty = searchParams.get("faculty")
     const group = searchParams.get("group")
     const weekStartParam = searchParams.get("weekStart")
 
-    if (!faculty || !group) {
+    if (!faculty || !group || !/^[a-z0-9-]{1,100}$/i.test(faculty)
+      || !/^[a-z0-9-]{1,100}$/i.test(group)) {
       return NextResponse.json({ error: "Missing faculty or group" }, { status: 400 })
     }
 

@@ -5,6 +5,7 @@ import { getChat, getChatMember, getChatAdministrators, getRoleFromStatus, getFo
 import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById, markChatMembersInactive, updateChatBotActive } from "@/lib/chat-store"
 import { updateUserBotActive } from '@/lib/user-store'
 import { getBotMessageTemplate } from '@/lib/bot-message-templates'
+import { checkRateLimit, getClientAddress } from '@/lib/rate-limit'
 
 export const runtime = "nodejs"
 
@@ -117,6 +118,16 @@ export async function POST(request: Request) {
   if (!hasValidWebhookSecret(request, webhookSecret)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
+  const rateLimit = checkRateLimit(`telegram-webhook:${getClientAddress(request)}`, {
+    limit: 120,
+    windowMs: 60_000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { ok: false, error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+    )
+  }
   if (!webAppUrl) {
     console.error("WEBAPP_URL or NEXT_PUBLIC_WEBAPP_URL is not set")
     return NextResponse.json({ ok: false, error: "WEBAPP_URL missing" }, { status: 500 })
@@ -128,20 +139,30 @@ export async function POST(request: Request) {
 
   try {
     const update = (await request.json()) as TelegramUpdate
-    console.log("=== Telegram update received ===", { update_id: update.update_id, has_message: !!update.message, has_edited_message: !!update.edited_message, has_my_chat_member: !!update.my_chat_member, has_chat_member: !!update.chat_member })
+    console.log('Telegram update received', {
+      hasMessage: Boolean(update.message),
+      hasEditedMessage: Boolean(update.edited_message),
+      hasMyChatMember: Boolean(update.my_chat_member),
+      hasChatMember: Boolean(update.chat_member),
+    })
     const message = update.message ?? update.edited_message
 
     if (message?.chat?.id) {
       const chatId = message.chat.id
       const isGroup = message.chat.type !== "private"
-      console.log("=== Message info ===", { chatId, chatType: message.chat.type, isGroup, text: message.text, has_new_chat_members: !!message.new_chat_members, has_left_chat_member: !!message.left_chat_member })
+      console.log('Telegram message received', {
+        chatType: message.chat.type,
+        isGroup,
+        hasNewChatMembers: Boolean(message.new_chat_members),
+        hasLeftChatMember: Boolean(message.left_chat_member),
+      })
 
       const command = getCommand(message.text)
 
       if (command === "/start") {
-        console.log("=== Handling /start command ===", { chatId, isGroup, chatType: message.chat.type, webAppUrl, miniAppUrl })
+        console.log('Handling /start command', { isGroup, chatType: message.chat.type })
         const text = await getBotMessageTemplate('start', isGroup ? 'group' : 'private')
-        console.log("=== Sending /start message ===", { text, chatId, isGroup, replyMarkupType: isGroup ? "url" : "web_app" })
+        console.log('Sending /start message', { isGroup })
         await sendTelegramMessage(botToken, chatId, text, {
           replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
         })
@@ -149,9 +170,9 @@ export async function POST(request: Request) {
       }
 
       if (command === "/settings") {
-        console.log("=== Handling /settings command ===", { chatId, isGroup, chatType: message.chat.type, webAppUrl, miniAppUrl })
+        console.log('Handling /settings command', { isGroup, chatType: message.chat.type })
         const text = await getBotMessageTemplate('settings', isGroup ? 'group' : 'private')
-        console.log("=== Sending /settings message ===", { text, chatId, isGroup, replyMarkupType: isGroup ? "url" : "web_app" })
+        console.log('Sending /settings message', { isGroup })
         await sendTelegramMessage(botToken, chatId, text, {
           replyMarkup: isGroup ? buildUrlKeyboard(miniAppUrl) : buildWebAppKeyboard(webAppUrl),
         })
@@ -166,10 +187,10 @@ export async function POST(request: Request) {
       }
 
       if (isGroup && message.new_chat_members) {
-      console.log("new_chat_members event in chat:", chatId, message.new_chat_members)
+      console.log('Telegram chat member added')
       for (const member of message.new_chat_members) {
         if (member.is_bot) {
-          console.log("Bot added to chat:", chatId)
+          console.log('Bot added to chat')
           const chatInfo = await getChat(botToken, chatId)
           const isForum = chatInfo?.is_forum ?? false
 
@@ -184,23 +205,22 @@ export async function POST(request: Request) {
             for (const admin of admins) {
               const role = getRoleFromStatus(admin.status)
               await createOrUpdateChatMember(chatId, admin.user.id, role)
-              console.log("Admin synced:", chatId, admin.user.id, role)
+              console.log('Chat administrator synced', { role })
             }
           }
 
           // Send welcome message with Mini App button
-          console.log("=== Bot added to group ===", { chatId, miniAppUrl })
+          console.log('Bot added to group')
           const welcomeText = `✅ Бот добавлен в группу!\n\n📖 Откройте веб-приложение, чтобы настроить расписание для этой группы.`
           await sendTelegramMessage(botToken, chatId, welcomeText, {
             replyMarkup: buildUrlKeyboard(miniAppUrl),
           })
         } else {
-          console.log("Member added to chat:", chatId, "member:", member.id)
+          console.log('Chat member added')
           const memberInfo = await getChatMember(botToken, chatId, member.id)
-          console.log("Member info from Telegram:", memberInfo)
           if (memberInfo) {
             const role = getRoleFromStatus(memberInfo.status)
-            console.log("Role:", role)
+            console.log('Chat member role synchronized', { role })
             await createOrUpdateChatMember(chatId, member.id, role)
             console.log("Chat member created/updated")
           }
@@ -257,7 +277,7 @@ export async function POST(request: Request) {
         }
 
         if (isActivationTransition && chat.type === "private") {
-          console.log("=== Bot activated in private chat ===", { chatId: chat.id, webAppUrl })
+          console.log('Bot activated in private chat')
           const activationText = "⚙️ Чтобы настроить уведомления:\n1) Откройте веб-приложение\n2) В группе выдайте боту права администратора"
           await sendTelegramMessage(
             botToken,
@@ -274,11 +294,12 @@ export async function POST(request: Request) {
 
     if (update.chat_member) {
       const { chat, new_chat_member, old_chat_member } = update.chat_member
-      console.log("=== chat_member event ===", { chatId: chat.id, userId: new_chat_member.user.id, status: new_chat_member.status, oldStatus: old_chat_member?.status })
+      console.log('Telegram chat member updated', {
+        status: new_chat_member.status,
+        oldStatus: old_chat_member?.status,
+      })
 
       const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
-      console.log("Member info from Telegram:", memberInfo)
-
       if (memberInfo) {
         const status = memberInfo.status as any
         const newRole = getRoleFromStatus(status)
@@ -289,11 +310,9 @@ export async function POST(request: Request) {
         if ((newRole === "creator" || newRole === "administrator") && !new_chat_member.user.is_bot) {
           console.log("User is now admin, syncing topics...")
           const topics = await getForumTopics(botToken, chat.id)
-          console.log("Topics from Telegram API:", topics)
-
           if (topics) {
             for (const topic of topics) {
-              console.log("Upserting topic:", topic)
+              console.log('Synchronizing forum topic')
               await upsertChatTopic({
                 id: topic.id,
                 chatId: chat.id,
@@ -334,13 +353,7 @@ export async function POST(request: Request) {
       const { name, icon_color, icon_custom_emoji_id } = message.forum_topic_created
       const threadId = message.message_thread_id
       const chatId = message.chat.id
-      console.log("=== forum_topic_created event ===", {
-        chatId,
-        thread_id: threadId,
-        name,
-        icon_color,
-        icon_custom_emoji_id,
-      })
+      console.log('Forum topic created')
       await upsertChatTopic({
         id: threadId,
         chatId: chatId,

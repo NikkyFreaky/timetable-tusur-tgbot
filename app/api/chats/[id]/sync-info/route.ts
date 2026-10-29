@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
-import { getChatById, getChatMemberRole, upsertChat } from "@/lib/chat-store"
-import { getChat, isAdmin } from "@/lib/telegram-api"
-import { requireTelegramInitData } from "@/lib/telegram-auth"
+import { getChatById, upsertChat } from "@/lib/chat-store"
+import { getChat } from "@/lib/telegram-api"
+import { limitTelegramMutation, requireTelegramInitData } from "@/lib/telegram-auth"
+import { verifyChatAdmin } from '@/lib/chat-access'
 
 export const runtime = "nodejs"
 
@@ -14,18 +15,23 @@ export async function POST(
   try {
     const auth = requireTelegramInitData(request)
     if ('response' in auth) return auth.response
+    const rateLimit = limitTelegramMutation(request, auth.data.user.id)
+    if (rateLimit) return rateLimit
 
     const { id } = await context.params
     const chatId = Number(id)
 
-    console.log("=== POST /api/chats/[id]/sync-info ===", { chatId })
+    console.log('Synchronizing chat information')
 
     if (!Number.isFinite(chatId)) {
       return NextResponse.json({ error: "Invalid chat id" }, { status: 400 })
     }
 
-    const role = await getChatMemberRole(chatId, auth.data.user.id)
-    if (!role || !isAdmin(role)) {
+    const access = await verifyChatAdmin(chatId, auth.data.user.id)
+    if (access === 'unavailable') {
+      return NextResponse.json({ error: 'Unable to verify chat permissions' }, { status: 503 })
+    }
+    if (access !== 'authorized') {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -35,8 +41,6 @@ export async function POST(
     }
 
     const telegramChat = await getChat(botToken, chatId)
-    console.log("Telegram API chat info:", telegramChat)
-
     if (!telegramChat) {
       return NextResponse.json({ error: "Failed to get chat info from Telegram" }, { status: 500 })
     }
@@ -52,7 +56,7 @@ export async function POST(
       isForum: telegramChat.is_forum ?? false,
     })
 
-    console.log("Chat synced:", updatedChat)
+    console.log('Chat information synchronized')
 
     return NextResponse.json({ chat: updatedChat })
   } catch (error) {

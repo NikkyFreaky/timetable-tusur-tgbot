@@ -44,7 +44,8 @@ function LoginForm() {
         return
       }
 
-      const next = searchParams.get('next') || '/admin'
+      const nextParam = searchParams.get('next')
+      const next = nextParam && /^\/(?!\/)/.test(nextParam) ? nextParam : '/admin'
       router.push(next)
       router.refresh()
     } catch {

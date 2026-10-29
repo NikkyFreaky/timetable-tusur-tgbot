@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
-import { getChatById, updateChatTopicId, getChatMemberRole } from "@/lib/chat-store"
-import { isAdmin } from "@/lib/telegram-api"
-import { requireTelegramInitData } from "@/lib/telegram-auth"
+import { getChatById, updateChatTopicId } from "@/lib/chat-store"
+import { limitTelegramMutation, requireTelegramInitData } from "@/lib/telegram-auth"
+import { verifyChatAdmin } from '@/lib/chat-access'
 
 export const runtime = "nodejs"
 
@@ -18,11 +18,13 @@ export async function POST(
   try {
     const auth = requireTelegramInitData(request)
     if ('response' in auth) return auth.response
+    const rateLimit = limitTelegramMutation(request, auth.data.user.id)
+    if (rateLimit) return rateLimit
 
     const { id } = await context.params
     const chatId = Number(id)
 
-    console.log("=== POST /api/chats/[id]/topic ===", { chatId })
+    console.log('Updating chat topic')
 
     if (!Number.isFinite(chatId)) {
       return NextResponse.json({ error: "Invalid chat id" }, { status: 400 })
@@ -30,20 +32,21 @@ export async function POST(
 
     const chat = await getChatById(chatId)
     if (!chat) {
-      console.log("Chat not found:", chatId)
+      console.log('Chat not found')
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
-    const role = await getChatMemberRole(chatId, auth.data.user.id)
-    if (!role || !isAdmin(role)) {
+    const access = await verifyChatAdmin(chatId, auth.data.user.id)
+    if (access === 'unavailable') {
+      return NextResponse.json({ error: 'Unable to verify chat permissions' }, { status: 503 })
+    }
+    if (access !== 'authorized') {
       console.log("Access denied: role is not admin")
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const payload = (await request.json()) as UpdateTopicPayload
     const { topicId } = payload
-
-    console.log("Updating topic:", { topicId })
 
     if (topicId !== null && !Number.isFinite(topicId)) {
       return NextResponse.json({ error: "Invalid topic ID" }, { status: 400 })
@@ -54,8 +57,6 @@ export async function POST(
     console.log("Topic updated successfully in database")
 
     const updatedChat = await getChatById(chatId)
-
-    console.log("Updated chat:", updatedChat)
 
     return NextResponse.json({ chat: updatedChat })
   } catch (error) {
