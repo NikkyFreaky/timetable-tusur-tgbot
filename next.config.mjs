@@ -5,7 +5,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' https://telegram.org${isDevelopment ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://t.me https://telegram.org",
+  "img-src 'self' data: blob: https://t.me https://telegram.org https://*.telesco.pe https://tusur.ru https://timetable.tusur.ru",
   "font-src 'self' data:",
   "connect-src 'self' https://*.supabase.co https://api.telegram.org https://timetable.tusur.ru https://tusur.ru",
   "frame-src https://web.telegram.org https://*.telegram.org",
