@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 import { NextResponse } from 'next/server'
-import { checkRateLimit, getClientAddress } from '@/lib/rate-limit'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60
 
@@ -91,8 +91,8 @@ export function requireTelegramInitData(request: Request):
 }
 
 /** Ограничивает частоту запросов от авторизованного пользователя Telegram. */
-export function limitTelegramMutation(request: Request, userId: number): NextResponse | null {
-  const result = checkRateLimit(`telegram-mutation:${userId}:${getClientAddress(request)}`, {
+export function limitTelegramMutation(_request: Request, userId: number): NextResponse | null {
+  const result = checkRateLimit(`telegram-mutation:${userId}`, {
     limit: 30,
     windowMs: 60_000,
   })

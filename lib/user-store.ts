@@ -474,10 +474,11 @@ export async function upsertUser(payload: {
 }
 
 export async function updateUserBotActive(userId: number, botActive: boolean) {
-  await supabase
+  const { error } = await supabase
     .from('users')
     .update({ bot_active: botActive, updated_at: new Date().toISOString() })
     .eq('id', userId)
+  if (error) throw error
 }
 
 async function recordLoginEvent(

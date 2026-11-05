@@ -14,7 +14,7 @@ async function getCurrentChatRole(chatId: number, userId: number) {
   const member = await getChatMember(botToken, chatId, userId)
   if (!member) return null
 
-  const role = getRoleFromStatus(member.status)
+  const role = getRoleFromStatus(member.status, member.is_member)
   await createOrUpdateChatMember(chatId, userId, role)
   return role
 }

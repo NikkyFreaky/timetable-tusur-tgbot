@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { cleanupExpired } from "@/lib/cache-store"
+import { cleanupTelegramUpdates } from '@/lib/telegram-update-store'
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -18,9 +19,11 @@ export async function GET(request: Request) {
 
   try {
     const deletedCount = await cleanupExpired()
+    const deletedUpdates = await cleanupTelegramUpdates()
     return NextResponse.json({
       ok: true,
       deleted: deletedCount,
+      deletedUpdates,
     })
   } catch (error) {
     console.error("Failed to cleanup cache:", error)

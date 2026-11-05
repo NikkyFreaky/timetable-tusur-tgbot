@@ -57,12 +57,13 @@ function mapDbChatToStoredChat(dbChat: any): StoredChat {
 }
 
 export async function getChatById(chatId: number): Promise<StoredChat | null> {
-  const { data: chat } = await supabase
+  const { data: chat, error } = await supabase
     .from("chats")
     .select()
     .eq("id", chatId)
-    .single()
+    .maybeSingle()
 
+  if (error) throw error
   if (!chat) return null
 
   return mapDbChatToStoredChat(chat)
@@ -89,11 +90,12 @@ export async function upsertChat(payload: {
   const now = new Date().toISOString()
   const chatId = Number(payload.chat.id)
 
-  const { data: existingChat } = await supabase
+  const { data: existingChat, error: readError } = await supabase
     .from("chats")
     .select("settings, topic_id, created_by, is_forum")
     .eq("id", chatId)
     .maybeSingle()
+  if (readError) throw readError
 
   const chatData = {
     id: chatId,
@@ -111,12 +113,13 @@ export async function upsertChat(payload: {
     last_seen_at: now,
   }
 
-  const { data: chat } = await supabase
+  const { data: chat, error } = await supabase
     .from("chats")
     .upsert(chatData, { onConflict: "id" })
     .select()
     .single()
 
+  if (error) throw error
   return mapDbChatToStoredChat(chat)
 }
 
@@ -126,21 +129,23 @@ export async function updateChatsNotificationState(
   if (updates.length === 0) return
 
   for (const { id, state } of updates) {
-    await supabase
+    const { error } = await supabase
       .from("chats")
       .update({
         notification_state: state as any,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
+    if (error) throw error
   }
 }
 
 export async function updateChatBotActive(chatId: number, botActive: boolean) {
-  await supabase
+  const { error } = await supabase
     .from('chats')
     .update({ bot_active: botActive, updated_at: new Date().toISOString() })
     .eq('id', chatId)
+  if (error) throw error
 }
 
 export async function listUserChats(userId: number): Promise<StoredChat[]> {
@@ -186,15 +191,16 @@ export async function createOrUpdateChatMember(
 ) {
   const now = new Date().toISOString()
 
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from("chat_members")
     .select()
     .eq("chat_id", chatId)
     .eq("user_id", userId)
-    .single()
+    .maybeSingle()
+  if (readError) throw readError
 
   if (existing) {
-    await supabase
+    const { error } = await supabase
       .from("chat_members")
       .update({
         role,
@@ -202,14 +208,16 @@ export async function createOrUpdateChatMember(
       })
       .eq("chat_id", chatId)
       .eq("user_id", userId)
+    if (error) throw error
   } else {
-    await supabase.from("chat_members").insert({
+    const { error } = await supabase.from("chat_members").insert({
       chat_id: chatId,
       user_id: userId,
       role,
       added_at: now,
       updated_at: now,
     })
+    if (error) throw error
   }
 }
 
@@ -229,7 +237,7 @@ export async function updateChatMemberRole(
 }
 
 export async function markChatMembersInactive(chatId: number) {
-  await supabase
+  const { error } = await supabase
     .from("chat_members")
     .update({
       role: "left",
@@ -237,6 +245,7 @@ export async function markChatMembersInactive(chatId: number) {
     })
     .eq("chat_id", chatId)
     .in("role", ["creator", "administrator", "member"])
+  if (error) throw error
 }
 
 export async function listChatTopics(chatId: number): Promise<ChatTopic[]> {
@@ -303,6 +312,7 @@ export async function upsertChatTopic(topic: {
 
   if (upsertError) {
     console.error("Failed to upsert topic:", upsertError)
+    throw upsertError
   } else {
     console.log("Topic upserted successfully")
   }

@@ -41,6 +41,7 @@ export function GroupSearchDrawer({
   const [isLoadingIndex, setIsLoadingIndex] = useState(false)
   const [indexError, setIndexError] = useState<string | null>(null)
   const [indexReady, setIndexReady] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
   const deferredQuery = useDeferredValue(query)
   const normalizedQuery = normalizeSearchValue(deferredQuery)
@@ -75,6 +76,9 @@ export function GroupSearchDrawer({
         const results = await Promise.all(
           loadedFaculties.map(async (faculty) => {
             const res = await fetch(`/api/faculties/${faculty.slug}/courses`)
+            if (res.status === 429) {
+              throw new Error('Слишком много запросов. Подождите немного и попробуйте снова.')
+            }
             if (!res.ok) throw new Error('Не удалось загрузить курсы')
             const courseData = (await res.json()) as { courses: CourseOption[] }
             return { slug: faculty.slug, courses: courseData.courses || [] }
@@ -107,7 +111,7 @@ export function GroupSearchDrawer({
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, loadAttempt])
 
   const matches = useMemo(
     () => buildGroupSearchMatches(normalizedQuery, faculties, coursesByFaculty),
@@ -181,8 +185,15 @@ export function GroupSearchDrawer({
         {/* Results / History */}
         <ScrollArea className="flex-1 overflow-y-auto px-4 pb-4">
           {indexError ? (
-            <div className="rounded-xl border border-border bg-card/50 px-3 py-4 text-center text-sm text-destructive">
-              {indexError}
+            <div role="alert" className="rounded-xl border border-border bg-card/50 px-3 py-4 text-center text-sm text-destructive">
+              <p>{indexError}</p>
+              <button
+                type="button"
+                onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+                className="mt-3 rounded-md px-3 py-2 font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+              >
+                Попробовать снова
+              </button>
             </div>
           ) : isLoadingIndex ? (
             <div className="rounded-xl border border-border bg-card/50 px-3 py-4 text-center text-sm text-muted-foreground">

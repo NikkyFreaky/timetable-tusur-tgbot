@@ -6,6 +6,7 @@ import { upsertChat, createOrUpdateChatMember, upsertChatTopic, getChatById, mar
 import { updateUserBotActive } from '@/lib/user-store'
 import { getBotMessageTemplate } from '@/lib/bot-message-templates'
 import { checkRateLimit, getClientAddress } from '@/lib/rate-limit'
+import { claimTelegramUpdate, completeTelegramUpdate, releaseTelegramUpdate } from '@/lib/telegram-update-store'
 
 export const runtime = "nodejs"
 
@@ -137,8 +138,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "MINI_APP_URL missing" }, { status: 500 })
   }
 
+  let claimed: { updateId: number; token: string } | undefined
   try {
     const update = (await request.json()) as TelegramUpdate
+    if (!Number.isSafeInteger(update.update_id) || update.update_id < 0) {
+      return NextResponse.json({ ok: false, error: 'Invalid update ID' }, { status: 400 })
+    }
+    const claim = await claimTelegramUpdate(update.update_id)
+    if (claim.state === 'completed') return NextResponse.json({ ok: true })
+    if (claim.state === 'busy') {
+      return NextResponse.json({ ok: false, error: 'Update is being processed' }, { status: 503 })
+    }
+    claimed = { updateId: update.update_id, token: claim.token }
     console.log('Telegram update received', {
       hasMessage: Boolean(update.message),
       hasEditedMessage: Boolean(update.edited_message),
@@ -192,7 +203,8 @@ export async function POST(request: Request) {
         if (member.is_bot) {
           console.log('Bot added to chat')
           const chatInfo = await getChat(botToken, chatId)
-          const isForum = chatInfo?.is_forum ?? false
+          if (!chatInfo) throw new Error('Failed to load Telegram chat')
+          const isForum = chatInfo.is_forum ?? false
 
           await upsertChat({
             chat: message.chat,
@@ -201,6 +213,7 @@ export async function POST(request: Request) {
 
           // Sync all administrators of group
           const admins = await getChatAdministrators(botToken, chatId)
+          if (!admins) throw new Error('Failed to load Telegram chat administrators')
           if (admins) {
             for (const admin of admins) {
               const role = getRoleFromStatus(admin.status)
@@ -218,8 +231,9 @@ export async function POST(request: Request) {
         } else {
           console.log('Chat member added')
           const memberInfo = await getChatMember(botToken, chatId, member.id)
+          if (!memberInfo) throw new Error('Failed to load Telegram chat member')
           if (memberInfo) {
-            const role = getRoleFromStatus(memberInfo.status)
+            const role = getRoleFromStatus(memberInfo.status, memberInfo.is_member)
             console.log('Chat member role synchronized', { role })
             await createOrUpdateChatMember(chatId, member.id, role)
             console.log("Chat member created/updated")
@@ -260,7 +274,8 @@ export async function POST(request: Request) {
         await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
 
         const chatInfo = await getChat(botToken, chat.id)
-        const isForum = chatInfo?.is_forum ?? false
+        if (!chatInfo) throw new Error('Failed to load Telegram chat')
+        const isForum = chatInfo.is_forum ?? false
 
         await upsertChat({
           chat: chat,
@@ -269,6 +284,7 @@ export async function POST(request: Request) {
 
         // Sync all administrators of group
         const admins = await getChatAdministrators(botToken, chat.id)
+        if (!admins && chat.type !== 'private') throw new Error('Failed to load Telegram chat administrators')
         if (admins) {
           for (const admin of admins) {
             const adminRole = getRoleFromStatus(admin.status)
@@ -300,9 +316,10 @@ export async function POST(request: Request) {
       })
 
       const memberInfo = await getChatMember(botToken, chat.id, new_chat_member.user.id)
+      if (!memberInfo) throw new Error('Failed to load Telegram chat member')
       if (memberInfo) {
         const status = memberInfo.status as any
-        const newRole = getRoleFromStatus(status)
+        const newRole = getRoleFromStatus(status, memberInfo.is_member)
         console.log("New role:", newRole)
 
         await createOrUpdateChatMember(chat.id, new_chat_member.user.id, newRole)
@@ -310,6 +327,7 @@ export async function POST(request: Request) {
         if ((newRole === "creator" || newRole === "administrator") && !new_chat_member.user.is_bot) {
           console.log("User is now admin, syncing topics...")
           const topics = await getForumTopics(botToken, chat.id)
+          if (!topics) throw new Error('Failed to load Telegram forum information')
           if (topics) {
             for (const topic of topics) {
               console.log('Synchronizing forum topic')
@@ -378,9 +396,17 @@ export async function POST(request: Request) {
       }
     }
 
+    await completeTelegramUpdate(claimed.updateId, claimed.token)
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error("Telegram webhook error:", error)
-    return NextResponse.json({ ok: true })
+    if (claimed) {
+      try {
+        await releaseTelegramUpdate(claimed.updateId, claimed.token)
+      } catch (releaseError) {
+        console.error('Failed to release Telegram update claim:', releaseError)
+      }
+    }
+    return NextResponse.json({ ok: false, error: 'Update processing failed' }, { status: 500 })
   }
 }

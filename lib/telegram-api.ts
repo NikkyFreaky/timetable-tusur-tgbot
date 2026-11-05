@@ -48,6 +48,7 @@ type ChatMemberInfo = {
     added_to_attachment_menu?: boolean
   }
   status: "creator" | "administrator" | "member" | "restricted" | "left" | "kicked"
+  is_member?: boolean
   custom_title?: string
   is_anonymous?: boolean
   can_be_edited?: boolean
@@ -137,13 +138,13 @@ export async function getForumTopics(
   return []
 }
 
-export function getRoleFromStatus(status: ChatMemberInfo["status"]): "creator" | "administrator" | "member" | "left" | "kicked" {
+export function getRoleFromStatus(status: string, isMember?: boolean): "creator" | "administrator" | "member" | "left" | "kicked" {
   if (status === "creator") return "creator"
   if (status === "administrator") return "administrator"
-  if (status === "restricted" || status === "member") return "member"
+  if (status === "member" || (status === "restricted" && isMember === true)) return "member"
   if (status === "left") return "left"
   if (status === "kicked") return "kicked"
-  return "member"
+  return "left"
 }
 
 export function isAdmin(role: "creator" | "administrator" | "member" | "left" | "kicked"): boolean {

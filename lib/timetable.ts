@@ -913,7 +913,22 @@ export async function fetchFaculties(): Promise<FacultyOption[]> {
   }
 }
 
+const coursesInFlight = new Map<string, Promise<CourseOption[]>>()
+
 export async function fetchFacultyCourses(facultySlug: string): Promise<CourseOption[]> {
+  const inflight = coursesInFlight.get(facultySlug)
+  if (inflight) return inflight
+
+  const promise = fetchFacultyCoursesUnshared(facultySlug)
+  coursesInFlight.set(facultySlug, promise)
+  try {
+    return await promise
+  } finally {
+    if (coursesInFlight.get(facultySlug) === promise) coursesInFlight.delete(facultySlug)
+  }
+}
+
+async function fetchFacultyCoursesUnshared(facultySlug: string): Promise<CourseOption[]> {
   const cacheKey = `courses:${facultySlug}`
 
   const cached = await get<CourseOption[]>(cacheKey)
@@ -924,7 +939,9 @@ export async function fetchFacultyCourses(facultySlug: string): Promise<CourseOp
   const staleData = await getWithStale<CourseOption[]>(cacheKey)
 
   try {
-    const response = await fetch(`${BASE_URL}/faculties/${facultySlug}`, { cache: "no-store" })
+    const response = await fetch(`${BASE_URL}/faculties/${facultySlug}`, {
+      cache: "no-store", signal: AbortSignal.timeout(10_000),
+    })
     if (!response.ok) {
       throw new Error(`Failed to fetch courses (${response.status})`)
     }
